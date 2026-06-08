@@ -35,6 +35,7 @@ cp -r ~/claude-skills/skills/* ~/.claude/skills/
 | `/audit-code` | Systematic code review against project conventions |
 | `/review-plan` | Stress-test any plan with structured expert critique |
 | `/review-plan-auto` | Automated iterative plan review with convergence detection and deterioration safeguards |
+| `/review-plan-codex` | External second opinion on a plan from GPT-5.5 via the codex CLI, sandwiched between two internal auto-review passes (requires the `@openai/codex` CLI and a ChatGPT Pro login) |
 | `/compile-latex` | Compile LaTeX documents, fix errors, re-compile until clean |
 | `/lit-review-verify` | Verify literature review claims against sources |
 | `/simulate-referee` | Simulate referee reports on a draft paper |
