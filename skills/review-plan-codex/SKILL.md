@@ -1,292 +1,267 @@
 ---
 name: review-plan-codex
-description: Use when the user wants an external second opinion on a plan from GPT-5.5 Pro via codex, or says "send the plan to GPT", "get ChatGPT to review my plan", "codex review of the plan", "external review of the plan", "second opinion on the plan from GPT-5.5", "/review-plan-codex", or wants an external GPT-5.5 critique round run as a standalone step on any plan (not just empirical Bob plans). Sandwiches an internal review-plan-auto pass, a codex/GPT-5.5 external review, and an audit of that review.
-argument-hint: "[file:path] [skip-internal] [skip-final] [help]"
-allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Skill"]
+description: Use when the user wants an external second opinion on a plan from GPT-5.5 Pro via codex, or says "send the plan to GPT", "get ChatGPT to review my plan", "codex review of the plan", "external review of the plan", "second opinion on the plan from GPT-5.5", "/review-plan-codex", or wants a cross-model critique round run as a standalone step on any plan (not just empirical Bob plans). Codex runs the convergence loops; Claude supplies the independent critique; each model's findings are audited by the other.
+argument-hint: "[file:path] [skip-internal] [skip-final] [local] [help]"
+allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Skill", "Agent"]
 ---
 
-# Review Plan via Codex (external second opinion)
+# Review Plan via Codex (cross-model sandwich)
 
-*Unattended three-stage sandwich: internal auto-review, external GPT-5.5 review via codex, audit of the external review.*
+*Unattended four-stage pipeline: Codex convergence loop, independent Claude
+critique, Codex triage of that critique, Codex final convergence check.*
 
-Sends a plan to GPT-5.5 Pro for an independent critique through `codex exec` (the
-`@openai/codex` CLI, routed through your ChatGPT Pro entitlement, no re-login),
-then triages every external finding. It runs on ANY plan: project plans,
-research plans, migrations, workflows, or Bob/GUARDRAIL empirical plans.
+The division of labor follows one principle: **iteration is mechanical,
+judgment is where model diversity pays.** The multi-pass convergence loops run
+on Codex (`codex exec` against the Codex-side `$review-plan-auto` skill,
+ChatGPT Pro entitlement, no per-call cost). Claude contributes exactly one
+fresh-context critique of the GPT-converged plan; that is where the second
+model family earns its keep. GPT-5.5 then audits Claude's findings, so each
+model's judgment is checked by the other. Claude tokens are spent only on
+orchestration, the single critique pass, and edit application.
 
-The external model is advisory. A confident-sounding external finding can be
-wrong (already addressed, factually off, or based on missing context). Stage 3
-exists so a wrong claim is rejected with a reason, never applied blindly.
+Any finding, from either model, can be wrong (already addressed, factually
+off, or based on missing context). The cross-audit exists so a wrong claim is
+rejected with a recorded reason, never applied blindly.
 
 ## Autonomy principle (load-bearing)
 
-This skill runs UNATTENDED. The user starts it and walks away. It must complete
-all three stages and produce a final report with zero mid-run interaction.
+This skill runs UNATTENDED. The user starts it and walks away. It must
+complete all stages and produce a final report with zero mid-run interaction.
 
-- NEVER call AskUserQuestion or otherwise block on the user mid-run. There is no
-  user watching to answer.
-- The internal pre-clean ALWAYS applies its revision and ALWAYS sends the
-  resulting MODIFIED plan to codex. Do not ask whether to send the modified or
-  original version; the modified version is the contract.
+- NEVER call AskUserQuestion or otherwise block on the user mid-run.
 - Apply changes automatically. Make every mutation recoverable instead of
-  gated: back up before each write, keep all backups, and put the diffs and a
-  one-line revert command in the final report. Recoverability replaces approval.
-- The only legitimate hard stop is a fail-loud abort (codex unreachable,
-  malformed codex output, detected confidential data). Abort with a clear
+  gated: back up before the first write, keep all backups, and put the diffs
+  and a one-line revert command in the final report. Recoverability replaces
+  approval.
+- The only legitimate hard stop is a fail-loud abort (detected confidential
+  data, or codex unusable AND local fallback impossible). Abort with a clear
   message; never pause to ask a question.
 
-## Sub-skill invocations are hard gates (load-bearing)
+## Stage gates (load-bearing)
 
-Two stages (Stage 1 and Stage 3.3) require invoking `review-plan-auto` as a real
-sub-skill through the Skill tool. These are gates, not intents. Violating the
-letter of the gate is violating the spirit: doing the equivalent critique
-yourself in place of the call is the exact failure this skill exists to prevent,
-because the whole value of the sandwich is an independent, iterating, multi-pass
-loop that you did not hand-roll and cannot shortcut on a confidence call.
+Three stages are gates, not intents. Violating the letter of a gate is
+violating the spirit: doing the stage's work yourself in place of the mandated
+call is the exact failure this skill exists to prevent, because it silently
+collapses the cross-model design back into a single model.
 
-A gate is satisfied ONLY by an actual Skill-tool call to `review-plan-auto` that
-records its convergence verdict in `$FIXES_FILE`. No recorded verdict means the
-stage did not run, which is an automatic FAIL. If the Skill tool cannot be
-called for any reason, ABORT loud (`review-plan-auto did not run: <reason>`); do
-not substitute your own pass, and do not continue to the next stage.
+| Gate | Satisfied ONLY by | Proof recorded in `$FIXES_FILE` |
+|---|---|---|
+| Stage 1 loop | `codex exec` run of `$review-plan-auto` (or the disclosed `local` fallback) | `loop1: CODEX` + its `CONVERGENCE:` line |
+| Stage 3 triage | `codex exec` run of the triage prompt (or the disclosed `local` fallback) | `triage: CODEX` + the triage table |
+| Stage 4 loop | `codex exec` run of `$review-plan-auto` (or the disclosed `local` fallback) | `loop2: CODEX` + its `CONVERGENCE:` line |
+
+Stage 2 has its own gate: the critique must come from a fresh-context Agent
+dispatch, not from you reviewing inline (inline is a disclosed fallback only).
+
+No recorded proof means the stage did not run: automatic FAIL. The `local`
+fallback path is legitimate ONLY when codex is unreachable or `local` was
+passed, and the final report must name every stage that fell back and why.
 
 | Rationalization | Reality |
 |---|---|
-| "I did the equivalent work by hand, lighter" | Not equivalent. The mandated loop iterates and checks convergence; one manual read does not. The lighter pass is the defect, not a substitute. |
-| "review-plan-auto is heavy, no need to spawn it twice" | The cost is the contract. Both gates fire on every run, full stop. |
-| "Risk of skipping is small / the plan already looks clean" | There is no degenerate-skip gate. Confidence and a clean-looking plan do not satisfy the gate. |
-| "I flagged the deviation, per say-so-if-done-differently" | That rule reports unavoidable gaps; it never authorizes skipping a mandated step. Disclosure is not consent. |
+| "I can run the convergence loop myself, it's faster" | Running it on Claude is the defect: it burns the metered budget and erases the GPT-converged baseline that Stage 2 stress-tests. |
+| "My findings are obviously valid, no need for GPT triage" | Self-audited findings are the failure mode. Confidence does not satisfy the gate. |
+| "Codex looked flaky earlier, I'll just do it all locally" | Fallback requires an actual failed preflight or call, recorded verbatim. A hunch is not a failure. |
+| "I flagged the deviation, per say-so-if-done-differently" | Disclosure is not consent. That rule reports unavoidable gaps; it never authorizes skipping a mandated call. |
 
 ## Confidentiality guard (non-interactive)
 
-The plan body is uploaded to OpenAI. Because the run is unattended, this is a
-detect-and-abort guard, not a question. Scan the plan for obvious confidential
-markers (internal Fed data, non-public datasets, credentials, tokens, embargoed
-material). If any are found, ABORT loud with what was detected and where, and
-send nothing. Otherwise proceed. Starting an unattended run on a given plan is
-the user's authorization to send that plan externally.
+The plan body, and in Stage 3 Claude's findings, are uploaded to OpenAI.
+Because the run is unattended, this is a detect-and-abort guard, not a
+question. Scan the plan for obvious confidential markers (internal Fed data,
+non-public datasets, credentials, tokens, embargoed material). If any are
+found, ABORT loud with what was detected and where, and send nothing.
+Otherwise proceed. Starting an unattended run on a given plan is the user's
+authorization to send that plan externally. The `local` flag exists for plans
+that must not leave the machine.
 
-## Transport: the codex bridge
+## Transport reference
 
-The codex transport mechanics are vendored into this skill so it runs
-self-contained:
+Read `~/.claude/skills/review-plan-codex/references/codex-transport.md` before
+Stage 1; it is the source of truth for both codex call shapes (loop and
+triage), shell-quoting of `$review-plan-auto`, response extraction, the
+`CONVERGENCE:` line grammar, the fixes schema, and the sad-path branches.
 
-- Preflight (codex reachable + token estimate): `~/.claude/skills/review-plan-codex/scripts/codex-preflight.sh`
-- Invocation, response extraction, sad-path branches, and the triage/fixes
-  schema: `~/.claude/skills/review-plan-codex/references/codex-transport.md`
-- Strict GUARDRAIL review prompt: `~/.claude/skills/review-plan-codex/references/codex-review-prompt-strict.md`
-- Generic (non-GUARDRAIL) review prompt: `~/.claude/skills/review-plan-codex/references/generic-review-prompt.md`
-
-Read `codex-transport.md` before Stage 2; it is the source of truth for the
-codex call and the response-extraction grep.
-
-## Stage 0: Locate the plan and set names
+## Stage 0: Locate the plan, set names, preflight
 
 1. Parse `$ARGUMENTS`. If `help`, print the flag table below and stop.
 
    | Flag | Effect |
    |---|---|
    | `file:path` | Explicit plan location |
-   | `skip-internal` | Skip Stage 1 (no pre-clean); go straight to codex |
-   | `skip-final` | Skip the Stage 3 final convergence re-review |
+   | `skip-internal` | Skip Stage 1 (no Codex pre-clean loop) |
+   | `skip-final` | Skip the Stage 4 final convergence loop |
+   | `local` | No codex calls: loops via local `review-plan-auto` Skill, triage by Claude, all disclosed |
    | `help` | Print this table and stop |
 
-2. Locate the plan (same four-tier priority as review-plan-auto): explicit
+2. Locate the plan (four-tier priority, same as review-plan-auto): explicit
    `file:` argument, then project `plans/` or `notes/` or `pap/` (most recent
    match), then most recent file in `~/.claude/plans/`, then conversation
    history. If none found, stop with: "No plan found. Usage:
    `/review-plan-codex file:path/to/plan.md`".
 
-3. Derive a slug from the plan filename and set artifact paths in a sibling
-   folder (keeps the plan's directory uncluttered):
+3. Derive a slug and set artifact paths in a sibling folder:
 
    ```bash
    PLAN_DIR="$(dirname "$PLAN_PATH")"
    BASE="$(basename "$PLAN_PATH" .md)"
    OUT_DIR="$PLAN_DIR/${BASE}_codex"; mkdir -p "$OUT_DIR"
    DATE="$(date +%Y%m%d)"
-   RAW_OUT="$OUT_DIR/${BASE}_codex_raw_${DATE}.txt"
-   REVIEW_FILE="$OUT_DIR/${BASE}_codex_review_${DATE}.md"
+   LOOP1_RAW="$OUT_DIR/${BASE}_codex_loop1_raw_${DATE}.txt"
+   REVIEW_FILE="$OUT_DIR/${BASE}_claude_review_${DATE}.md"
+   TRIAGE_RAW="$OUT_DIR/${BASE}_codex_triage_raw_${DATE}.txt"
    FIXES_FILE="$OUT_DIR/${BASE}_codex_fixes_${DATE}.md"
+   LOOP2_RAW="$OUT_DIR/${BASE}_codex_loop2_raw_${DATE}.txt"
    BACKUP="$OUT_DIR/${BASE}_pre_codex_${DATE}.md"
    ```
 
-## Stage 1: Internal pre-clean (review-plan-auto)
+4. Preflight (skip if `local`):
 
-Skip if `skip-internal` is set.
+   ```bash
+   bash ~/.claude/skills/review-plan-codex/scripts/codex-preflight.sh "$BASE" "$PLAN_PATH"
+   ```
 
-Run the internal critique loop first so you do not spend an external round on
-issues Claude can already catch. This stage ALWAYS applies and the resulting
-modified plan is what proceeds to Stage 2.
+   On non-zero exit: do NOT abort. Record the preflight stderr verbatim in
+   `$FIXES_FILE`, switch the entire run to `local` mode, and say so in the
+   final report ("codex unreachable, ran in local mode: <stderr>"). If
+   `TOKEN_ESTIMATE` exceeds ~150k, note the size warning in the report and
+   proceed (unattended runs do not stop to ask about trimming).
 
-1. Back up the plan first: `cp "$PLAN_PATH" "$BACKUP"`. The backup is the revert
-   target named in the final report; it is what makes auto-apply safe.
-2. Invoke `review-plan-auto` by **calling the Skill tool** with `file:$PLAN_PATH`.
-   This is a hard gate (see "Sub-skill invocations are hard gates"), not an
-   intent. Doing the equivalent critique yourself in its place ("by hand", "a
-   lighter pass", "I already caught the issues") is non-conforming and
-   forbidden, however confident you are or however clean the plan looks. In
-   normal mode it converges and writes its revision to `$PLAN_PATH` in place;
-   let it. Record `review-plan-auto: INVOKED` plus its convergence verdict in
-   `$FIXES_FILE` as proof-of-execution. A Stage 1 with no recorded verdict is an
-   automatic FAIL. If the Skill tool cannot be called, ABORT loud
-   (`review-plan-auto did not run: <reason>`); do not substitute your own review
-   and do not proceed to Stage 2.
-3. Do NOT ask the user whether to keep the revision. The now-modified
-   `$PLAN_PATH` is the Stage 2 input unconditionally. Record the diff
-   (`$BACKUP` vs `$PLAN_PATH`) for the final report so the user can inspect or
-   revert after the run.
+5. Back up before anything mutates: `cp "$PLAN_PATH" "$BACKUP"`. The backup is
+   the whole-run revert target.
 
-## Stage 2: External review via codex
+## Stage 1: Codex convergence loop (pre-clean)
 
-### 2.1 Preflight (gate)
+Skip if `skip-internal`.
 
-```bash
-bash ~/.claude/skills/review-plan-codex/scripts/codex-preflight.sh "$BASE" "$PLAN_PATH"
-```
+Run the full iterative review-plan-auto loop on Codex so the plan converges
+before the independent critique round is spent on it.
 
-If exit code is non-zero (codex unreachable or plan missing), STOP and surface
-the preflight stderr verbatim. Do not fall back silently. Fail loud: tell the
-user codex is unreachable and what to do (`npm install -g @openai/codex@latest`,
-then `codex login`).
+1. Invoke per the loop call shape in `codex-transport.md`: working directory
+   `$PLAN_DIR` (workspace-write must cover the plan file), sandbox
+   `workspace-write`, prompt `$review-plan-auto file:$PLAN_PATH` (single-quote
+   the literal so the shell does not expand `$review`), stdout to
+   `$LOOP1_RAW`. Launch with `run_in_background: true` and wait for the
+   completion notification; a multi-pass loop routinely outruns foreground
+   Bash timeouts. Do not poll with sleep.
+2. On completion, extract the `CONVERGENCE:` line (grammar in
+   `codex-transport.md`) and record `loop1: CODEX` plus that line in
+   `$FIXES_FILE`. The loop writes its revision to `$PLAN_PATH` in place; let
+   it. The revised plan is the Stage 2 input unconditionally.
+3. Sad paths (full table in `codex-transport.md`): non-zero exit means run the
+   local `review-plan-auto` Skill fallback with disclosure; a missing
+   `CONVERGENCE:` line with clear evidence the loop ran (summary present, plan
+   mtime changed) means record `verdict=UNPARSED` plus the summary's exit line
+   and continue.
 
-If `TOKEN_ESTIMATE` exceeds ~150k, warn the user the plan is large and ask
-whether to proceed or trim, per `codex-transport.md` sad-path test 13.
+`local` mode: invoke the `review-plan-auto` Skill on `file:$PLAN_PATH`, record
+`loop1: LOCAL` plus its convergence verdict.
 
-### 2.2 Choose the review prompt (adaptive)
+## Stage 2: Independent Claude critique (single pass)
 
-Detect whether the plan is a Bob/GUARDRAIL plan:
+This is the cross-model judgment pass: a fresh evaluation of the
+GPT-converged plan by a different model family. One pass, no loop.
 
-```bash
-if grep -qE 'GUARDRAIL\[|^[[:space:]]*(threshold|assertion|ladder|escalation):' "$PLAN_PATH"; then
-  PROMPT_FILE=~/.claude/skills/review-plan-codex/references/codex-review-prompt-strict.md   # strict Bob rubric
-else
-  PROMPT_FILE=~/.claude/skills/review-plan-codex/references/generic-review-prompt.md        # generic rubric
-fi
-```
+1. Choose the rubric:
 
-Strict rubric expects GUARDRAIL blocks and 3am-executor framing; the generic
-rubric uses missing-checks / fragile-assumptions / ambiguity. Both emit the same
-three top-level headers so Stage 2.4 parsing is identical.
+   ```bash
+   if grep -qE 'GUARDRAIL\[|^[[:space:]]*(threshold|assertion|ladder|escalation):' "$PLAN_PATH"; then
+     PROMPT_FILE=~/.claude/skills/review-plan-codex/references/codex-review-prompt-strict.md
+   else
+     PROMPT_FILE=~/.claude/skills/review-plan-codex/references/generic-review-prompt.md
+   fi
+   ```
 
-### 2.3 Build the full prompt and invoke codex
+2. Dispatch ONE `Agent` call (`subagent_type="general-purpose"`). Its prompt
+   is: a 2-4 sentence context briefing you derive from the plan (what it is,
+   who or what executes it, what failure looks like; never a literal
+   placeholder), then the full rubric file content, then the full current
+   plan text. Instruct it to return only the review, using the rubric's three
+   exact headers. Fresh context is the point: the subagent must not see your
+   conversation, the Stage 1 output, or any hint of expected findings.
+3. Write the returned review to `$REVIEW_FILE` and validate:
 
-Prepend a short problem briefing so the external model starts with context; it
-has zero project knowledge. Derive the briefing yourself from the plan (2-4
-sentences: what this plan is, who or what executes it, what a failure looks
-like). Do not leave a literal placeholder.
+   ```bash
+   for H in "## Missing verifications" "## Potential problems" "## Unclear demands"; do
+     grep -q "^$H" "$REVIEW_FILE" || { echo "FAIL: missing $H"; exit 1; }
+   done
+   ```
 
-The codex call runs 1-3 min synchronously. The Bash tool default timeout is 2
-min, so a 3-min call would be killed and misreported as a codex failure. Set an
-explicit `timeout: 300000` (5 min) on this Bash call.
+   On a malformed return, re-dispatch once; if still malformed, fall back to
+   an inline critique with the critic stance ("you are the critic, not the
+   planner") and disclose the fallback in the report.
+4. If all three sections say nothing to flag, record "Claude found no issues
+   in the converged plan" in `$FIXES_FILE` and skip to Stage 4 (which then
+   also skips, since no fixes were applied; the report still shows both
+   verdicts).
 
-```bash
-FULL_PROMPT="$(cat "$PROMPT_FILE")
+## Stage 3: Codex triage of Claude's findings
 
----
-Context briefing: <your 2-4 sentence briefing here>.
+GPT-5.5 audits the Stage 2 findings against the plan. Findings survive only
+with a recorded validity verdict.
 
----
-Plan to review:
+1. Build the triage prompt per `codex-transport.md`: the content of
+   `references/codex-triage-prompt.md`, the same context briefing, the full
+   plan, and the full `$REVIEW_FILE`. Invoke codex read-only, foreground,
+   explicit `timeout: 300000` (single-shot call, 1-3 min typical). Stdout to
+   `$TRIAGE_RAW`.
+2. Extract the response (last `^codex$` to `^tokens used$`, strip `^hook: `
+   lines) and validate the headers `## Triage table` and
+   `## Fix recommendations`. On non-zero exit or malformed output: perform the
+   triage yourself with disclosure ("cross-model audit unavailable:
+   <reason>"); do so skeptically, but know this is the degraded path and say
+   so in the report.
+3. Build `$FIXES_FILE` from the triage using the fixes-plan schema in
+   `codex-transport.md`. Validity (VALID / PARTIAL / INVALID) and confidence
+   (HIGH / MEDIUM / LOW) come from the triage; keep INVALID rows with their
+   one-line justifications as the audit trail. Any finding rejected as
+   INVALID with LOW confidence goes in the final report under "Cross-model
+   disagreement, spot-check these": a weak rejection of a Claude finding is
+   user-relevant signal, not noise.
+4. Apply fixes: for each VALID or PARTIAL item, turn the triage's fix
+   recommendation into an Edit block (exact old-text / new-text against the
+   current plan) and apply it to `$PLAN_PATH` without asking. If old-text
+   does not match (drift), skip that block, record it in `$FIXES_FILE`, and
+   continue with the remaining blocks. If every finding is INVALID, record
+   "no plan-fixable issues survived triage" and skip Stage 4.
 
-$(cat "$PLAN_PATH")"
+## Stage 4: Codex final convergence check
 
-codex exec \
-  --skip-git-repo-check \
-  --sandbox read-only \
-  "$FULL_PROMPT" < /dev/null > "$RAW_OUT" 2>&1
-EXIT=$?
-```
+Skip if `skip-final` or no fixes were applied in Stage 3.
 
-If `EXIT` != 0: codex failed. Inspect `$RAW_OUT`, surface the error, and STOP.
-No async fallback (per `codex-transport.md` sad-path test 14).
-
-### 2.4 Extract the response
-
-Take lines between the LAST `^codex$` marker and `^tokens used$` (codex can emit
-multiple scaffolding cycles; the final answer is always last):
-
-```bash
-START=$(grep -n "^codex$" "$RAW_OUT" | tail -1 | cut -d: -f1)
-END=$(grep -n "^tokens used$" "$RAW_OUT" | head -1 | cut -d: -f1)
-sed -n "$((START + 1)),$((END - 1))p" "$RAW_OUT" > "$REVIEW_FILE"
-```
-
-Validate the three required headers are present:
-
-```bash
-for H in "## Missing verifications" "## Potential problems" "## Unclear demands"; do
-  grep -q "^$H" "$REVIEW_FILE" || { echo "FAIL: missing $H"; exit 1; }
-done
-```
-
-If a header is missing, the codex output is malformed. STOP and tell the user to
-retry (sad-path test 17). Do not partially proceed.
-
-## Stage 3: Audit the external review
-
-The external review is NOT applied as-is. Audit it.
-
-### 3.1 Triage every finding
-
-Build `$FIXES_FILE` using the fixes-plan schema in `codex-transport.md`.
-For each external finding, assign:
-
-- Validity: VALID (correct, not already handled), PARTIAL (right problem, wrong
-  or incomplete fix), INVALID (wrong, already addressed, or missing-context).
-- Confidence: HIGH / MEDIUM / LOW.
-
-INVALID findings are dropped with a one-line justification (kept in
-`$FIXES_FILE` as the audit trail). VALID and PARTIAL findings become Edit blocks
-(exact old-text / new-text). LOW-confidence items are still applied if VALID or
-PARTIAL, but flagged in the final report under "Low-confidence, review these"
-so the user can spot-check them after the run.
-
-If every finding is INVALID, record "Codex found no plan-fixable issues" in
-`$FIXES_FILE` and skip to Stage 3.3.
-
-### 3.2 Apply automatically (backup already exists)
-
-The run is unattended, so apply the VALID and PARTIAL fixes directly to
-`$PLAN_PATH` without asking. `$BACKUP` from Stage 1 is the revert target (if
-Stage 1 was skipped, `cp "$PLAN_PATH" "$BACKUP"` before the first edit). For
-each Edit block, if its old-text does not match the current plan (drift),
-restore from `$BACKUP`, record the failed block in `$FIXES_FILE`, and continue
-with the remaining blocks rather than aborting the whole run. The final report
-lists what applied, what drifted, and the revert command.
-
-### 3.3 Final convergence check (review-plan-auto)
-
-Skip if `skip-final` is set or no fixes were applied.
-
-Re-run `review-plan-auto` by **calling the Skill tool** with `file:$PLAN_PATH`
-on the merged plan, to confirm the externally-driven edits did not introduce new
-inconsistencies. This is a hard gate (see "Sub-skill invocations are hard
-gates"), not an intent: re-reading the merged plan yourself does NOT satisfy it,
-no matter how confident you are that the edits are consistent. It may revise the
-plan in place; that is fine, `$BACKUP` remains the full-revert target. Record
-`review-plan-auto (final): INVOKED` plus its verdict in `$FIXES_FILE`; no
-recorded verdict is an automatic FAIL. If the Skill tool cannot be called, ABORT
-loud rather than substituting your own read.
+Re-run the Codex loop on the merged plan to confirm the applied edits
+introduced no new inconsistencies: same call shape as Stage 1 with prompt
+`$review-plan-auto file:$PLAN_PATH max:2` (a consistency check, not a fresh
+full review), stdout to `$LOOP2_RAW`, background launch. Record `loop2:
+CODEX` plus its `CONVERGENCE:` line in `$FIXES_FILE`. It may revise the plan
+in place; `$BACKUP` remains the full-revert target. Same sad paths and
+`local` fallback as Stage 1.
 
 ## Output to the user (end of run)
 
-This is the single report the user reads after the unattended run. Include, in
-this order:
-1. Stage 1 outcome: applied / skipped, plus the pre-clean diff summary.
-2. Codex run: model, token count, `$REVIEW_FILE` path.
-3. Triage summary: N findings, breakdown VALID / PARTIAL / INVALID.
-4. Fixes applied to the plan (list), any drifted blocks, and low-confidence
-   items to spot-check.
-5. Final convergence verdict (or skipped).
-6. Revert command: `cp "$BACKUP" "$PLAN_PATH"` to undo the entire run.
+The single report after the unattended run. Include, in this order:
 
-State explicitly anything skipped or unverified (skipped stages, drifted blocks,
-codex warnings). Do not report "done" if a stage was skipped.
+1. Engine table: one row per stage (1, 2, 3, 4) with engine used
+   (CODEX / CLAUDE / LOCAL-fallback), outcome or verdict, and skipped stages
+   marked as skipped with the reason.
+2. Stage 1 `CONVERGENCE:` line and the pre-clean diff summary
+   (`$BACKUP` vs post-Stage-1 plan).
+3. Stage 2: finding counts per rubric section, `$REVIEW_FILE` path.
+4. Triage summary: N findings, breakdown VALID / PARTIAL / INVALID, plus the
+   "Cross-model disagreement, spot-check these" list (INVALID + LOW).
+5. Fixes applied (list) and any drifted blocks.
+6. Stage 4 `CONVERGENCE:` line (or skipped).
+7. Revert command: `cp "$BACKUP" "$PLAN_PATH"` to undo the entire run.
+
+State explicitly anything skipped, fallen back, or unverified (preflight
+failure, unparsed verdict lines, malformed triage, drifted blocks). Do not
+report "done" if a stage was skipped or degraded.
 
 ## Artifacts (kept for audit trail)
 
-- `${BASE}_codex_raw_<DATE>.txt`: raw codex stdout (extraction debugging).
-- `${BASE}_codex_review_<DATE>.md`: extracted GPT-5.5 review.
-- `${BASE}_codex_fixes_<DATE>.md`: triage table and proposed edits.
+- `${BASE}_codex_loop1_raw_<DATE>.txt`: raw Stage 1 loop stdout.
+- `${BASE}_claude_review_<DATE>.md`: Claude's independent critique.
+- `${BASE}_codex_triage_raw_<DATE>.txt`: raw Stage 3 triage stdout.
+- `${BASE}_codex_fixes_<DATE>.md`: gate proofs, triage table, edits, audit trail.
+- `${BASE}_codex_loop2_raw_<DATE>.txt`: raw Stage 4 loop stdout.
 - `${BASE}_pre_codex_<DATE>.md`: plan backup (revert target).
