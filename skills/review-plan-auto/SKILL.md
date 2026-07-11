@@ -222,12 +222,15 @@ Add to `pass_history`:
 
 | # | Condition | Trigger | Exit reason |
 |---|-----------|---------|-------------|
-| 1 | Clean exit | `count(Red_plan_fixable) == 0` | No critical issues remain |
-| 2 | Subagent approves | Verdict = APPROVE | Reviewer sees no issues |
-| 3 | Deterioration (churn) | Any issue label that was present in pass K, absent in pass K+1, and present again now | Circular changes detected |
-| 4 | Score regression | `pass > 1` and `score` worsened by 3+ points vs. previous pass | Plan getting worse |
-| 5 | Marginal improvement | `pass > 1` AND `count(Red_plan_fixable) == 0` AND score improved by 0 or 1 point | Diminishing returns |
-| 6 | Hard cap | `pass_number == max` | Safety limit reached |
+| 1 | Inflation guard | Applying this pass's revision would push the plan past `1.5 * original_lines`, or grow it by more than 40% in this single pass | Inflation detected |
+| 2 | Clean exit | `count(Red_plan_fixable) == 0` | No critical issues remain |
+| 3 | Subagent approves | Verdict = APPROVE | Reviewer sees no issues |
+| 4 | Deterioration (churn) | Any issue label that was present in pass K, absent in pass K+1, and present again now | Circular changes detected |
+| 5 | Score regression | `pass > 1` and `score` worsened by 3+ points vs. previous pass | Plan getting worse |
+| 6 | Marginal improvement | `pass > 1` AND `count(Red_plan_fixable) == 0` AND score improved by 0 or 1 point | Diminishing returns |
+| 7 | Hard cap | `pass_number == max` | Safety limit reached |
+
+When the inflation guard fires: do NOT apply the offending revision. Keep the current (pre-revision) plan as the final version and carry the pass's unaddressed findings into the summary under FINDINGS NOT APPLIED, each with its suggested fix, so the user can adopt them by hand. A plan that cannot absorb its fixes within a bounded size is telling you the fixes belong in a report, not in the plan; growth without convergence is the signature failure this guard exists to stop.
 
 Marginal improvement only fires when Red == 0. If Red items persist, the loop continues until the hard cap, deterioration, or Red items are resolved. This prevents premature stops while critical issues remain.
 
@@ -255,7 +258,7 @@ At pass `max - 1`, if convergence has not been reached, emit:
 
 **Normal mode:** If the plan source is a file, write the final plan to the file.
 
-Output the summary using the skeleton in `templates/final-summary.md`.
+Output the summary using the skeleton in `templates/final-summary.md`. The plan-size line and the DECISION-PENDING section are always filled in; FINDINGS NOT APPLIED appears only when the inflation guard fired.
 
 If the exit reason is Deterioration detected, append the DETERIORATION REPORT section from the same template.
 
