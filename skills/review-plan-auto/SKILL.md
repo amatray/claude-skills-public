@@ -145,7 +145,7 @@ Dimension 7 is conditional: include its subagent only when the plan mentions Adv
 > For each issue found, classify its **fixability** alongside its severity:
 > - **[Plan-fixable]** — The plan text can be revised to address this (add a step, clarify a section, reorder, add a contingency).
 > - **[Upstream]** — This issue originates outside the plan: inconsistent naming conventions across project files, input data format mismatches, tool configuration problems, missing upstream decisions, or infrastructure constraints. Revising the plan cannot fix the root cause; it must be addressed elsewhere. Do NOT generate fix recommendations for upstream issues.
-> - **[Decision-pending]** — The issue concerns a choice the plan explicitly leaves open for the user (a section titled "Open decisions", "Open questions", or equivalent). An open decision is a feature of the plan, not a gap: report it so the user sees it, but do NOT generate a fix, and do NOT propose process machinery to manage the openness.
+> - **[Decision-pending]**: The issue concerns a choice the plan explicitly leaves open for the user (a section titled "Open decisions", "Open questions", or equivalent). An open decision is a feature of the plan, not a gap: report it so the user sees it, but do NOT generate a fix, and do NOT propose process machinery to manage the openness.
 >
 > Examples of upstream issues: folder names use mixed conventions (backslash vs underscore vs space), input data arrives in inconsistent formats, a dependency has not been configured yet, a decision by another team is pending.
 > Examples of plan-fixable issues: a step is missing, instructions are vague, sequencing creates a hidden blocker, no contingency for a known risk.

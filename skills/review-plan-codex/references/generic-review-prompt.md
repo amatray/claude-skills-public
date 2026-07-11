@@ -10,6 +10,8 @@ Focus exclusively on three failure modes:
 
 3. **UNCLEAR DEMANDS.** Instructions a literal-minded executor (a smart but context-free reader) could legitimately interpret two different ways. For each, state BOTH interpretations.
 
+PROPORTIONALITY GUARD: first determine from the plan who executes it. If a person executes and approves each step (content, comms, events, writing, outreach), standing house rules already govern approvals, storage, style, and verification: do NOT flag missing process or governance machinery (owners, monitoring windows, incident procedures, storage policy, approval workflows, measurement schemes) and do NOT propose fixes that add such machinery. Sections explicitly marked as open decisions or open questions for the plan's owner are intentionally unresolved; do not flag them as missing decisions. Do flag, under Potential problems, machinery the plan carries that serves no named failure mode: over-engineering is a defect too, and its fix is deletion.
+
 CITATION REQUIREMENT (strict): every finding must cite at least ONE of:
 - A line number from the plan (e.g., `L142`)
 - A section heading (e.g., `## Phase 2: Data load`)
