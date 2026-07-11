@@ -2,7 +2,7 @@
 name: audit-paper
 description: Audit academic papers (economics/finance) for typos, grammar, style, prose quality, apparatus, structural coherence, holistic craft, and AI-pattern detection. Default uses track-changes markup in Modules 2-7; use --clean for clean text throughout. Module 6 (Voice & Craft) is offered after Module 5 completes; Module 7 (AI Pattern Detection) is offered after Module 6. Use when user asks to audit or review a paper.
 disable-model-invocation: false
-argument-hint: "[--clean] [--modules 1,2,5] [path-to-paper-files]"
+argument-hint: "[--html] [--clean] [--modules 1,2,5] [path-to-paper-files]"
 ---
 
 # 0. OPTIONAL: CITATION VERIFICATION
@@ -20,6 +20,8 @@ This is a single yes/no question. Do not elaborate or explain the citation verif
 
 # A. MODE DETECTION
 
+**Check `$ARGUMENTS` for `--html` first.** If `--html` is present, this is **batch HTML mode**: load `references/batch-html-mode.md` and follow it instead of the sequential stop-and-check workflow described in the rest of this file. All selected modules run in one unattended pass and every suggestion is written to an interactive HTML review page. The `--clean` / `--modules` flags still apply (in `--html` mode, clean vs track-changes becomes the page's default edit form, asked once up front; per the edit-form rule, Module 1 typos/grammar are always applied clean and only Modules 2-7 honor the toggle). Do not run the sequential workflow below when `--html` is set.
+
 **First, check `$ARGUMENTS` for the `--clean` flag.** If `--clean` appears in the arguments, use **CLEAN MODE** without asking. If `--clean` is absent, **ask the user before proceeding:**
 
 > "Would you like me to use **track-changes markup** (`\rsout{deleted}` / `\red{added}`) or **clean text** for suggestions in Modules 2–7? (Module 1 always uses clean text.)"
@@ -30,6 +32,8 @@ Wait for the answer. Then proceed with the selected mode.
 |------|----------|-------------|
 | **Track-changes** | Clean corrected text | `\rsout{deleted text}` and `\red{added text}` markup |
 | **Clean** | Clean corrected text | Clean corrected text |
+
+**Granularity:** mark whole words, not letters. `\rsout{}` wraps the entire old word(s); `\red{}` wraps the entire replacement word(s). Never strike or add part of a word, and never break inside a LaTeX macro or `$...$` math span.
 
 **Re-read this box before writing suggestions for EACH module.**
 
@@ -47,7 +51,7 @@ State this once; do not repeat in later modules.
 
 ## A2. MODULE SELECTION
 
-**Check `$ARGUMENTS` for `--modules`.** If `--modules N,N,N` appears (e.g., `--modules 1,2,5`), run only those modules in order. Skip unselected modules automatically without asking. If `--modules` is absent, follow the default sequential workflow with stop-and-check points as described below.
+**Check `$ARGUMENTS` for `--modules`.** If `--modules N,N,N` appears (e.g., `--modules 1,2,5`), run only those modules in order. Skip unselected modules automatically without asking. If `--modules` is absent, follow the default sequential workflow with stop-and-check points as described below. `--modules` composes with `--html`: in batch HTML mode, only the selected modules are serialized into the page.
 
 
 # B. CRITICAL WORKFLOW REQUIREMENTS
@@ -205,6 +209,8 @@ The 7 modules live in `references/`. For each selected module (per `--modules` o
 
 **Default workflow:** Run Module 1 first, then prompt to continue. After Module 5 completes, ask whether to run Module 6. After Module 6, ask whether to run Module 7. The stop-and-wait language and any external file prerequisites (writing-style guidelines for Module 6, humanizer rules for Module 7) live inside each module file.
 
+**Batch HTML mode (`--html`):** the stop-and-wait sequence above is replaced wholesale by the procedure in `references/batch-html-mode.md`. The same module files supply the checks; only the output path (one interactive HTML page instead of per-module chat) and the apply mechanism differ. Module 1 edits are always applied clean; Modules 2-7 honor the page's clean/track-changes toggle.
+
 
 ---
 
@@ -226,6 +232,8 @@ This includes but is not limited to:
 **Before proceeding to each new module, I must review all feedback you have provided on previous modules and ensure I apply it consistently.**
 
 **I must NEVER flag the same issue type again after you have indicated it should not be flagged.**
+
+**Durable feedback across runs.** The carry-forward above only persists within the current run. At the start of every run, in either mode, I must read `references/standing-feedback.md` and apply its entries as binding (suppressions, classifications, conventions). When you reject a card with a general instruction ("stop flagging this", "this is correct", "always classify it this way"), I add it there so it survives into future runs instead of dying with the session.
 
 
 ## General Rules for All Modules

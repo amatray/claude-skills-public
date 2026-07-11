@@ -35,6 +35,28 @@ all three stages and produce a final report with zero mid-run interaction.
   malformed codex output, detected confidential data). Abort with a clear
   message; never pause to ask a question.
 
+## Sub-skill invocations are hard gates (load-bearing)
+
+Two stages (Stage 1 and Stage 3.3) require invoking `review-plan-auto` as a real
+sub-skill through the Skill tool. These are gates, not intents. Violating the
+letter of the gate is violating the spirit: doing the equivalent critique
+yourself in place of the call is the exact failure this skill exists to prevent,
+because the whole value of the sandwich is an independent, iterating, multi-pass
+loop that you did not hand-roll and cannot shortcut on a confidence call.
+
+A gate is satisfied ONLY by an actual Skill-tool call to `review-plan-auto` that
+records its convergence verdict in `$FIXES_FILE`. No recorded verdict means the
+stage did not run, which is an automatic FAIL. If the Skill tool cannot be
+called for any reason, ABORT loud (`review-plan-auto did not run: <reason>`); do
+not substitute your own pass, and do not continue to the next stage.
+
+| Rationalization | Reality |
+|---|---|
+| "I did the equivalent work by hand, lighter" | Not equivalent. The mandated loop iterates and checks convergence; one manual read does not. The lighter pass is the defect, not a substitute. |
+| "review-plan-auto is heavy, no need to spawn it twice" | The cost is the contract. Both gates fire on every run, full stop. |
+| "Risk of skipping is small / the plan already looks clean" | There is no degenerate-skip gate. Confidence and a clean-looking plan do not satisfy the gate. |
+| "I flagged the deviation, per say-so-if-done-differently" | That rule reports unavoidable gaps; it never authorizes skipping a mandated step. Disclosure is not consent. |
+
 ## Confidentiality guard (non-interactive)
 
 The plan body is uploaded to OpenAI. Because the run is unattended, this is a
@@ -99,8 +121,17 @@ modified plan is what proceeds to Stage 2.
 
 1. Back up the plan first: `cp "$PLAN_PATH" "$BACKUP"`. The backup is the revert
    target named in the final report; it is what makes auto-apply safe.
-2. Invoke the `review-plan-auto` skill with `file:$PLAN_PATH`. In normal mode it
-   converges and writes its revision to `$PLAN_PATH` in place. Let it.
+2. Invoke `review-plan-auto` by **calling the Skill tool** with `file:$PLAN_PATH`.
+   This is a hard gate (see "Sub-skill invocations are hard gates"), not an
+   intent. Doing the equivalent critique yourself in its place ("by hand", "a
+   lighter pass", "I already caught the issues") is non-conforming and
+   forbidden, however confident you are or however clean the plan looks. In
+   normal mode it converges and writes its revision to `$PLAN_PATH` in place;
+   let it. Record `review-plan-auto: INVOKED` plus its convergence verdict in
+   `$FIXES_FILE` as proof-of-execution. A Stage 1 with no recorded verdict is an
+   automatic FAIL. If the Skill tool cannot be called, ABORT loud
+   (`review-plan-auto did not run: <reason>`); do not substitute your own review
+   and do not proceed to Stage 2.
 3. Do NOT ask the user whether to keep the revision. The now-modified
    `$PLAN_PATH` is the Stage 2 input unconditionally. Record the diff
    (`$BACKUP` vs `$PLAN_PATH`) for the final report so the user can inspect or
@@ -228,10 +259,15 @@ lists what applied, what drifted, and the revert command.
 
 Skip if `skip-final` is set or no fixes were applied.
 
-Re-run `review-plan-auto` with `file:$PLAN_PATH` on the merged plan as a final
-pass to confirm the externally-driven edits did not introduce new
-inconsistencies. It may revise the plan in place; that is fine, `$BACKUP`
-remains the full-revert target. Report its verdict.
+Re-run `review-plan-auto` by **calling the Skill tool** with `file:$PLAN_PATH`
+on the merged plan, to confirm the externally-driven edits did not introduce new
+inconsistencies. This is a hard gate (see "Sub-skill invocations are hard
+gates"), not an intent: re-reading the merged plan yourself does NOT satisfy it,
+no matter how confident you are that the edits are consistent. It may revise the
+plan in place; that is fine, `$BACKUP` remains the full-revert target. Record
+`review-plan-auto (final): INVOKED` plus its verdict in `$FIXES_FILE`; no
+recorded verdict is an automatic FAIL. If the Skill tool cannot be called, ABORT
+loud rather than substituting your own read.
 
 ## Output to the user (end of run)
 

@@ -1,6 +1,6 @@
 ---
 name: lit-review-verify
-description: Use when the user wants to verify whether the citations in a LaTeX or markdown manuscript actually support the claims they're attached to, or wants a citation audit against their .bib. Triggers on "check my citations", "verify references", "citation audit", "do my citations actually support what I wrote", "audit bibliography against claims", or "/lit-review-verify". Extracts claim-citation pairs, classifies each claim (FACTUAL/FINDING/METHOD/GENERAL), resolves DOIs, fetches abstracts, and flags misattributions or weak references.
+description: Use when the user wants to verify whether the citations in a LaTeX or markdown manuscript actually support the claims they're attached to, or wants a citation audit against their .bib. Triggers on "check my citations", "verify references", "citation audit", "do my citations actually support what I wrote", "audit bibliography against claims", or "/lit-review-verify". Not for producing a literature review or finding related papers (use /lit-review), and not for cleaning bib metadata (use /clean-bib).
 argument-hint: "[path-to-tex-or-md-file] [--bib path-to-bib] [--section intro|litreview|all]"
 allowed-tools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "Agent", "AskUserQuestion", "mcp__bib-cleaner__scopus_abstract_retrieval", "mcp__bib-cleaner__scopus_search", "mcp__bib-cleaner__crossref_doi_lookup", "mcp__bib-cleaner__crossref_fuzzy_match", "mcp__bib-cleaner__openalex_search", "mcp__bib-cleaner__openalex_citing_papers", "mcp__bib-cleaner__semantic_scholar_search", "mcp__bib-cleaner__semantic_scholar_paper", "mcp__bib-cleaner__repec_ideas_search", "mcp__bib-cleaner__resolve_bibtex"]
 ---
@@ -80,49 +80,7 @@ For citations WITH a DOI (from .bib), batch-query by DOI. For citations WITHOUT 
 
 For each citation, retrieve: (1) abstract, (2) whether it exists in Zotero, (3) PDF attachment path.
 
-**Batch DOI query for abstracts:**
-
-```sql
-SELECT idv_doi.value AS doi, idv_abs.value AS abstract
-FROM itemData id_abs
-JOIN itemDataValues idv_abs ON id_abs.valueID = idv_abs.valueID
-JOIN fields f_abs ON f_abs.fieldID = id_abs.fieldID
-JOIN itemData id_doi ON id_doi.itemID = id_abs.itemID
-JOIN itemDataValues idv_doi ON id_doi.valueID = idv_doi.valueID
-JOIN fields f_doi ON f_doi.fieldID = id_doi.fieldID
-WHERE f_abs.fieldName = 'abstractNote'
-AND f_doi.fieldName = 'DOI'
-AND LOWER(idv_doi.value) IN ('doi1', 'doi2', ...)
-AND id_abs.itemID NOT IN (SELECT itemID FROM deletedItems);
-```
-
-**Batch DOI query for PDF availability:**
-
-```sql
-SELECT idv_doi.value AS doi, ia.path AS attachment_path, ia.contentType
-FROM itemAttachments ia
-JOIN itemData id_doi ON id_doi.itemID = ia.parentItemID
-JOIN itemDataValues idv_doi ON id_doi.valueID = idv_doi.valueID
-JOIN fields f_doi ON f_doi.fieldID = id_doi.fieldID
-WHERE f_doi.fieldName = 'DOI'
-AND ia.contentType = 'application/pdf'
-AND LOWER(idv_doi.value) IN ('doi1', 'doi2', ...)
-AND ia.parentItemID NOT IN (SELECT itemID FROM deletedItems);
-```
-
-**Title-based fallback** (for citations without DOI):
-
-```sql
-SELECT idv_title.value AS title, idv_abs.value AS abstract
-FROM itemData id_title
-JOIN itemDataValues idv_title ON id_title.valueID = idv_title.valueID
-JOIN fields f_title ON f_title.fieldID = id_title.fieldID AND f_title.fieldName = 'title'
-LEFT JOIN itemData id_abs ON id_abs.itemID = id_title.itemID
-LEFT JOIN itemDataValues idv_abs ON id_abs.valueID = idv_abs.valueID
-LEFT JOIN fields f_abs ON f_abs.fieldID = id_abs.fieldID AND f_abs.fieldName = 'abstractNote'
-WHERE id_title.itemID NOT IN (SELECT itemID FROM deletedItems)
-AND LOWER(idv_title.value) LIKE '%normalized title%';
-```
+Batch queries: see references/zotero-queries.md (abstracts by DOI, PDF paths by DOI, title fallback).
 
 ### Phase 2b: Resolve DOIs for Citations Without One
 
@@ -231,96 +189,7 @@ Create the output directory if needed, then save:
 output/citation-verification-YYYY-MM-DD.md
 ```
 
-Report structure:
-
-```markdown
-# Citation Verification Report
-
-**Manuscript:** [filename]
-**Date:** [YYYY-MM-DD]
-**Pairs verified:** [N]
-
-## Summary
-
-**Pairs verified:** [N] | **Issues found:** [M] (MISMATCH: X, PARTIAL: Y, UNCERTAIN: Z, UNVERIFIABLE: W)
-**Zotero coverage:** [N] of [M] cited papers found in Zotero; [K] have PDF attachments.
-**DOI resolution:** [D] DOIs resolved via CrossRef fuzzy match (papers not in .bib or Zotero).
-**PDF re-verification:** [P] citations re-checked via full PDF (upgraded: [U], unchanged: [V]).
-**API status:** CrossRef: OK | Semantic Scholar: OK/rate-limited | Scopus: OK/unavailable (auth failed) | OpenAlex: OK
-
-If all citations check out, say: "All [N] claim-citation pairs verified. No issues found." and stop.
-
-## References Not in Zotero
-
-| # | Author(s), Year | Title | DOI resolved? | Abstract Source |
-|---|----------------|-------|---------------|----------------|
-| 1 | Smith (2020) | "Title..." | Yes (CrossRef) | CrossRef / S2 / Scopus / None |
-
-If all references were found in Zotero, write: "All [N] cited references found in Zotero."
-
-## Issues
-
-Only show citations that are NOT supported. Do not list SUPPORTED citations anywhere.
-
-### Mismatches
-
-**Suggestion [N]. Line [L]: [short claim summary]**
-- **Claim:** "[exact claim text]"
-- **Cited:** [Author (Year), journal]
-- **Abstract says:** [relevant excerpt from abstract]
-- **Issue:** [brief explanation of the mismatch]
-- **Suggested fix:**
-```
-[ready-to-use replacement text that the user can accept verbatim]
-```
-- **Bib entry (if new citation needed):**
-```bibtex
-[new bib entry, only if the fix introduces a citation not already in the .bib file]
-```
-
-### Partial Matches
-
-**Suggestion [N]. Line [L]: [short claim summary]**
-- **Claim:** "[exact claim text]"
-- **Cited:** [Author (Year), journal]
-- **Abstract says:** [relevant excerpt]
-- **Issue:** [what is overstated/understated/imprecise]
-- **Suggested fix:**
-```
-[ready-to-use replacement text]
-```
-- **Bib entry (if new citation needed):**
-```bibtex
-[new bib entry, only if needed]
-```
-
-### Uncertain
-
-| # | Line | Claim summary | Citation | Why uncertain | Zotero PDF? |
-|---|------|--------------|----------|---------------|-------------|
-
-### Unverifiable
-
-| # | Line | Citation | Reason |
-|---|------|----------|--------|
-
-### Suggested Additional or Alternative References
-
-For each claim where a better reference was found:
-
-**Alt [N]. Line [L]: [short claim summary]**
-- **Current citation:** [Author (Year)]
-- **Current verdict:** [PARTIAL/MISMATCH/UNCERTAIN/UNVERIFIABLE]
-- **Suggested alternative:** [Author (Year), "Title", Journal]
-- **Why:** [one sentence: why this paper is a better fit for the specific claim]
-- **DOI:** [doi]
-- **Bib entry:**
-```bibtex
-[ready-to-use bib entry for the alternative]
-```
-
-If no alternatives found, write: "No better references identified."
-```
+Report structure: follow templates/report-template.md exactly.
 
 Present the report summary to the user inline as well (not just the file). Only show the issues, never list SUPPORTED citations.
 

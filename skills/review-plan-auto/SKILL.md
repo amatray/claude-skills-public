@@ -1,6 +1,6 @@
 ---
 name: review-plan-auto
-description: Use when the user wants automated iterative plan review with convergence detection (multiple review passes without manual approval between iterations) OR wants to audit a plan's adversarial-agent contract (check that Adversary, Verifier, audit-readiness, or determinism agents are wired always-on, not conditionally gated). Triggers on "auto-review the plan", "iterate on plan review", "review my plan thoroughly", "keep reviewing until it's tight", "/review-plan-auto", "check whether my adversarial agents will actually fire", "audit how the plan wires the Adversary", "stress-test the safety machinery in my plan", "is this plan safe for an overnight run", "verify the plan's adversarial-agent contract", "make sure the Adversary in this plan is not just a deterministic check", or any case where the user would otherwise run `/review-plan` repeatedly. Includes safeguards against deterioration, circular changes, and surfaces upstream issues that plan revision cannot fix.
+description: Use when the user wants automated iterative plan review with convergence detection (multiple review passes without manual approval between iterations) OR wants to audit a plan's adversarial-agent contract (check that Adversary, Verifier, audit-readiness, or determinism agents are wired always-on, not conditionally gated). Triggers on "auto-review the plan", "iterate on plan review", "review my plan thoroughly", "keep reviewing until it's tight", "/review-plan-auto", "check whether my adversarial agents will actually fire", "audit how the plan wires the Adversary", "stress-test the safety machinery in my plan", "is this plan safe for an overnight run", "verify the plan's adversarial-agent contract", "make sure the Adversary in this plan is not just a deterministic check", or any case where the user would otherwise run `/review-plan` repeatedly.
 argument-hint: "[file:path] [role:\"...\"] [focus:dimension] [depth:quick|standard|deep] [max:N] [dryrun] [help]"
 allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Agent", "WebSearch", "WebFetch"]
 ---
@@ -109,7 +109,7 @@ Dimension 7 is conditional: include its subagent only when the plan mentions Adv
 4. **Best-practice alignment** — How does this compare to standards from the research?
 5. **Sequencing** — Are there hidden blockers? Would reordering reduce risk?
 6. **Specificity** — Could someone unfamiliar execute each step?
-7. **Adversarial-agent contract** — Conditional, fires only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. Apply the detection patterns in `~/.claude/preferences/adversarial-agent-contract.md`: (a) flag conditional-gating language within 20 lines of any agent specification block (`if `, `only when `, `gated by `, `conditional on `, `skip when`) UNLESS a sibling `cannot_do_job:` block appears within the same window; (b) require a closed `slo_enum` YAML block at the top of the plan body declaring the allowed `slo_status` and per-predicate verdict values, plus a `role_invocation_audit.json` emission at finalization; (c) require the cost-benefit push-back to be present in the plan's rationale section, naming the specific failure modes each committed agent catches in THIS task (not generic citations); (d) confirm that every Adversary, Verifier, audit-readiness, or determinism spec declares its dispatch mode (Task vs inline) and that no fallback is documented. Each violation is a [Red] [Plan-fixable] issue. If the plan does not mention any of the trigger terms, this dimension reports "n/a" and contributes nothing to the score.
+7. **Adversarial-agent contract** — Conditional, fires only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. In the dimension-7 subagent prompt, give the path `~/.claude/preferences/adversarial-agent-contract.md` and instruct the subagent to Read that file and apply its full detection patterns and contract requirements; flag as violations: conditional-gating language near an agent spec without a sibling `cannot_do_job:` block, a missing closed `slo_enum` declaration or `role_invocation_audit.json` emission, missing task-specific cost-benefit push-back, and any undeclared dispatch mode or documented fallback. Each violation is a [Red] [Plan-fixable] issue. If the plan does not mention any of the trigger terms, this dimension reports "n/a" and contributes nothing to the score.
 
 **Upstream/plan-fixable classification instruction (include in subagent prompt):**
 
@@ -216,49 +216,9 @@ At pass `max - 1`, if convergence has not been reached, emit:
 
 **Normal mode:** If the plan source is a file, write the final plan to the file.
 
-Output the summary in this format:
+Output the summary using the skeleton in `templates/final-summary.md`.
 
-```
-AUTOMATED PLAN REVIEW — [Plan Title]
-
-Reviewing as: Meticulous [role]
-Plan source: [file path / plan mode / conversation]
-Depth: [quick / standard / deep]
-Passes completed: [N] / [max]
-Exit reason: [Clean exit | Subagent approves | Deterioration detected | Score regression | Marginal improvement | Hard cap reached]
-
-BEST PRACTICES CONTEXT
-[3-5 key principles from Step 3 research]
-
-CONVERGENCE TRAJECTORY
-| Pass | Score | Red | Yellow | Fixed | New |
-|------|-------|-----|--------|-------|-----|
-| 1    | -7    | 2   | 1      | --    | --  |
-| 2    | -4    | 1   | 1      | 2     | 1   |
-| 3    | -1    | 0   | 1      | 1     | 0   |
-
-ISSUE LOG
-- [Label]: [Status across passes]
-  Pass 1: [Red] [Description]
-  Pass 2: Fixed — [what changed]
-- [Label]: persists
-  Pass 1: [Yellow] [Description]
-  Pass 3: [Yellow] [Still present]
-
-UPSTREAM ISSUES (not fixable by plan revision)
-1. [Label] — [Description]. Root cause: [explanation]. Recommended action: [what to change upstream].
-
-FINAL PLAN
-[The plan as revised after the last pass, with [CHANGED] and [NEW] markers preserved]
-```
-
-If the exit reason is "Deterioration detected," add a DETERIORATION REPORT section:
-```
-DETERIORATION REPORT
-The following issue(s) were fixed in a previous pass but reintroduced:
-- [Label] (present in pass [K], fixed in pass [K+1], reintroduced in pass [N])
-This suggests revision churn. The plan has been rolled back to the version from pass [K+1] (before the reintroduction).
-```
+If the exit reason is Deterioration detected, append the DETERIORATION REPORT section from the same template.
 
 ## Examples
 

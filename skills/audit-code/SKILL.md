@@ -15,29 +15,9 @@ argument-hint: "[path-to-dofiles-directory]"
 **Report only problems.** Don't list what you checked or what was already fine. The user already trusts that you ran the audit; padding the report with "Module 1: no issues found in `01_clean.do`" buries the actual findings.
 
 
-# Code Audit
+## Workflow
 
-I want you to audit the different dofiles.
-
-The audit should proceed in **three** steps:
-
-- **Module 1**: Look through all the dofiles and make sure that all the macros that are called in later dofiles are defined at some point. Similarly, make sure that all the paths are correctly specified.
-
-- **Module 2**: Analyze each dofile separately and only focus on the internal consistency of the code within the dofile.
-
-- **Module 3**: Go again through all the code and identify all the variables that are created but never used later.
-
-
-## IMPORTANT: Stop-and-Check Points
-
-Throughout this project, there are mandatory **STOP AND CHECK** points. At each of these points, you must:
-
-1. Summarize what you have completed
-2. Present key outputs for review
-3. List any issues or concerns
-4. **Wait for human approval before proceeding**
-
-Do not proceed past a STOP checkpoint without explicit approval.
+Three modules, run strictly in order, each ending at a STOP checkpoint: Module 1 (paths and macros), Module 2 (per-dofile internal consistency), Module 3 (unused variables). Full instructions in each module's section below.
 
 
 ---
@@ -119,20 +99,7 @@ Do NOT suggest replacing these commands with base Stata equivalents.
 
 ### Before submitting each dofile audit
 
-Re-read each item. Delete any item where:
-- The "Solution" code is identical to the "Original" code
-- You wrote "no change needed", "this is fine", "no issue", or similar
-- You are simply confirming that existing code is correct
-
-
-### What NOT to include in the audit
-
-- **Only report actual problems or changes needed.** Do NOT list things that are already correct.
-- Do NOT say things like "this already uses gegen — no change needed" or "this is correct"
-- If the code is fine, do not mention it at all
-- Every item in your audit should be something that requires action or a decision from me
-- **NEVER describe your review process.** Do not say "I checked X and it was fine" or "After reviewing, I found no issues with Y"
-- **If a dofile has no issues, simply state "No critical issues" and "No suggestions" — nothing else. Do not explain what you looked at or what was already correct.**
+Re-read each item and delete any whose Solution code is identical to the Original, or that merely confirms existing code is correct ("no change needed", "this is fine"). Never describe the review process ("I checked X and it was fine"). If a dofile has no issues, state only "No critical issues" and "No suggestions", nothing else.
 
 
 ### MANDATORY STOP AFTER EACH DOFILE
