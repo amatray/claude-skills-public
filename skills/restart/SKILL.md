@@ -1,6 +1,6 @@
 ---
 name: restart
-description: Use when the user says "restart", "wrap up", "snapshot before clearing", "pickup notes", or wants to clear context and resume current work in a fresh conversation. Writes a structured restart.md to the project root with goal, decisions, open items, files touched, and verification commands, then instructs the user to type /clear.
+description: Use when the user says "restart", "wrap up", "snapshot before clearing", "pickup notes", "session recap", "session log", or wants to clear context and resume current work in a fresh conversation. Writes a structured restart.md to the project root, led by a Created / Sent / Waiting / Next recap and keeping goal, decisions, open items, files touched, and verification commands, appends that recap to a running SESSION_LOG.md, then instructs the user to type /clear.
 argument-hint: "none"
 allowed-tools: ["Write", "Read", "Edit", "Bash"]
 ---
@@ -98,6 +98,17 @@ Proceed only if the user confirms.
 | 14 | **Files Touched** — created / modified / deleted, with role | required | 30 files total | Source: `git diff --name-only` + recall |
 
 **Omit-if-empty rule:** Any optional section with zero bullets is dropped entirely (header + body), not shown as "(none)". This keeps the file tight.
+
+### The Session recap block (headline)
+
+restart.md leads with a short, scannable `## Session recap` that groups the session into four buckets, sourced from the same recall. It is a summary view; the detailed sections below carry the depth for a fresh Claude.
+
+- **Created**: new files or artifacts produced this session, each with a one-line purpose. Source: `git diff --name-only` plus recall; overlaps Files Touched (Created), kept terse here.
+- **Sent**: external messages dispatched this session (email via the gmail MCP, Slack), with the returned message ID when there is one. Omit the group entirely if nothing was sent.
+- **Waiting on {party}**: external dependencies and pending replies. Same items as Blocked / Waiting On, named by the party (for example "Waiting on IDB").
+- **Ready, not started**: the immediate next actions, the same first entries as What's Still Open.
+
+Close the block with one short sign-off line (for example "Everything is on disk; nothing is lost on clear."). The same block, dated, is prepended to `SESSION_LOG.md` in Step 6.
 
 ## Step 6 — Write restart.md
 
