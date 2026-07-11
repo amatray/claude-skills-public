@@ -95,7 +95,7 @@ Issue the searches as parallel calls in a single message (they are independent),
 
 ### Step 4: Structured Review (parallel fan-out)
 
-**Why fan out:** The 6 dimensions are independent — sequencing analysis does not depend on completeness analysis. One serial subagent reviewing all 6 makes wall-clock equal to the sum of all 6. Dispatching one subagent per dimension in a single message collapses wall-clock to the slowest single dimension, with no loss of rigor: each reviewer still sees the full plan.
+**Why fan out:** The active dimensions are independent: sequencing analysis does not depend on completeness analysis. One serial subagent reviewing all of them makes wall-clock equal to the sum of every dimension. Dispatching one subagent per dimension in a single message collapses wall-clock to the slowest single dimension, with no loss of rigor: each reviewer still sees the full plan.
 
 **Why fresh-context review matters:** If you wrote or helped develop the plan, you carry planner bias — you're more likely to rationalize gaps than catch them. A fresh-context reviewer sees the plan cold, the way a colleague or referee would.
 
@@ -146,7 +146,7 @@ Review against these dimensions (7 is conditional, 8 is always on):
 - **Red** — Critical. Will likely cause failure if unaddressed.
 - **Yellow** — Important. Creates risk but plan can proceed.
 - **Green** — Minor. Nice-to-have improvement.
-- **[Decision-pending]** — The finding concerns a choice the plan explicitly leaves open for the user (a section titled "Open decisions", "Open questions", or equivalent). An open decision is a feature of the plan, not a gap: report it in its own list, never as Red/Yellow, and never resolve it in a revision.
+- **[Decision-pending]**: The finding concerns a choice the plan explicitly leaves open for the user (a section titled "Open decisions", "Open questions", or equivalent). An open decision is a feature of the plan, not a gap: report it in its own list, never as Red/Yellow, and never resolve it in a revision.
 
 **Anchoring rule (subagent and inline paths alike):** every Red or Yellow finding must name or quote the specific plan step or section it concerns; a finding about an omission must state "absent from plan". A finding that cannot be anchored this way is not reportable: unanchored critique is how generic, plausible-sounding filler enters a review.
 
@@ -176,7 +176,7 @@ WEAKNESSES & GAPS
 [Green] [Label] — [Issue] → Fix: [Recommendation]
 
 DECISION-PENDING (open decisions the plan leaves to the user; omit if empty)
-- [Label] — [The open decision the finding concerns]
+- [Label]: [The open decision the finding concerns]
 
 VERDICT
 APPROVE — [Rationale]
@@ -187,7 +187,7 @@ REVISED PLAN (only if REVISE)
 [Full revised plan with [CHANGED] and [NEW] markers, within the revision constraint above]
 
 FINDINGS NOT APPLIED (only if the size budget forced any out; omit if empty)
-- [Label] — [Issue] → Suggested fix: [the fix, for manual adoption]
+- [Label]: [Issue] → Suggested fix: [the fix, for manual adoption]
 ```
 
 ### Step 6: Iteration Gate
