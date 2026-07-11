@@ -64,6 +64,23 @@ If `role:"..."` is provided, use that instead.
 
 **Announce:** "**Reviewing as:** Meticulous [role]. (Override with `role:"your role"` if this doesn't fit.)"
 
+### Step 2b: Execution-Mode Calibration
+
+Classify who executes the plan. This sets the review posture and is as load-bearing as the role: the same critique dimensions applied with the wrong posture inflate a small plan into project-management scaffolding.
+
+| Execution mode | Signals | Posture |
+|---|---|---|
+| `autonomous-execution` | An agent or machine runs the plan text unattended (Bob, overnight runs, pipelines, batch jobs); the plan text is the only carrier of safeguards | Full rigor: missing checks, gates, and escalation paths are real gaps |
+| `human-in-the-loop` | A person executes or approves each step (content, comms, events, teaching, writing, outreach); standing house rules (approval gates, storage conventions, style and verification rules) already govern execution | Parsimony: the plan's job is substance, not governance |
+
+Default to `human-in-the-loop` when no agent, pipeline, or unattended run is named in the plan.
+
+**Announce** the mode alongside the role: "**Execution mode:** [mode]."
+
+For `human-in-the-loop` plans, include this instruction in every critique prompt (subagent and inline alike):
+
+> A person executes and approves each step of this plan, operating under standing house rules (explicit approval before anything ships, storage conventions, style and verification rules). Absence of process or governance machinery (owners, monitoring windows, incident procedures, storage policy, approval workflows, measurement schemes) is NOT a finding unless the plan text contradicts a standing rule. Review the substance instead: are the claims correct and verifiable, is each deliverable feasible, is the sequencing sound.
+
 ### Step 3: Research Best Practices
 
 Extract the plan's primary domain and approach. Build web search queries:
@@ -85,9 +102,11 @@ Issue the searches as parallel calls in a single message (they are independent),
 
 **Initialize state:**
 - `pass_number = 1`
-- `pass_history = []` (list of {pass, score, red_labels, yellow_labels, fixed, new})
+- `pass_history = []` (list of {pass, score, lines, red_labels, yellow_labels, fixed, new})
 - `upstream_items = []` (accumulated across passes)
+- `decision_pending_items = []` (accumulated across passes)
 - `current_plan = <plan text from Step 1>`
+- `original_lines = <line count of current_plan>` (the inflation-guard baseline)
 
 ---
 
@@ -107,9 +126,9 @@ In a single message, dispatch one `Agent` call (`subagent_type="general-purpose"
 6. The per-dimension critique output format
 7. The anchoring rule
 
-Dimension 7 is conditional: include its subagent only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. Otherwise dispatch the 6 core dimensions and treat dimension 7 as "n/a".
+Dimension 7 is conditional: include its subagent only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. Otherwise dispatch the 7 core dimensions (1 to 6 and 8) and treat dimension 7 as "n/a". Dimension 8 is always on.
 
-**The 7 review dimensions:**
+**The 8 review dimensions:**
 
 1. **Pre-mortem** — "It's 3 months later and this plan failed. What were the top 3 causes?"
 2. **Completeness** — What's missing that a domain expert would expect?
@@ -119,14 +138,18 @@ Dimension 7 is conditional: include its subagent only when the plan mentions Adv
 6. **Specificity** — Could someone unfamiliar execute each step?
 7. **Adversarial-agent contract** — Conditional, fires only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. In the dimension-7 subagent prompt, give the path `~/.claude/preferences/adversarial-agent-contract.md` and instruct the subagent to Read that file and apply its full detection patterns and contract requirements; flag as violations: conditional-gating language near an agent spec without a sibling `cannot_do_job:` block, a missing closed `slo_enum` declaration or `role_invocation_audit.json` emission, missing task-specific cost-benefit push-back, and any undeclared dispatch mode or documented fallback. Each violation is a [Red] [Plan-fixable] issue. If the plan does not mention any of the trigger terms, this dimension reports "n/a" and contributes nothing to the score.
 
+8. **Proportionality**: Always on; this is the counterweight to the gap-finding dimensions, which can only ever push a plan to grow. What in this plan is more process than its stakes justify? Flag as findings: sections whose deletion would not change the outcome, restatements of rules the standing environment already enforces, and machinery (gates, state machines, role tables, owners, measurement windows) that serves no named failure mode. Over-engineering findings are classified Red/Yellow plan-fixable like any other, and their fix is deletion or tightening, never addition.
+
 **Upstream/plan-fixable classification instruction (include in subagent prompt):**
 
 > For each issue found, classify its **fixability** alongside its severity:
 > - **[Plan-fixable]** — The plan text can be revised to address this (add a step, clarify a section, reorder, add a contingency).
 > - **[Upstream]** — This issue originates outside the plan: inconsistent naming conventions across project files, input data format mismatches, tool configuration problems, missing upstream decisions, or infrastructure constraints. Revising the plan cannot fix the root cause; it must be addressed elsewhere. Do NOT generate fix recommendations for upstream issues.
+> - **[Decision-pending]** — The issue concerns a choice the plan explicitly leaves open for the user (a section titled "Open decisions", "Open questions", or equivalent). An open decision is a feature of the plan, not a gap: report it so the user sees it, but do NOT generate a fix, and do NOT propose process machinery to manage the openness.
 >
 > Examples of upstream issues: folder names use mixed conventions (backslash vs underscore vs space), input data arrives in inconsistent formats, a dependency has not been configured yet, a decision by another team is pending.
 > Examples of plan-fixable issues: a step is missing, instructions are vague, sequencing creates a hidden blocker, no contingency for a known risk.
+> Examples of decision-pending issues: the plan asks the user to choose between two scopes, the plan defers a channel or sequencing choice to the user, the plan lists open questions for a later session.
 
 **Per-dimension critique output format (each subagent returns findings for its dimension only):**
 
@@ -152,7 +175,11 @@ Merge the per-dimension findings into one consolidated review: collect strengths
 
 #### 4a-iii. Generate revision (only if REVISE)
 
-Dispatch a single `Agent` call (`subagent_type="general-purpose"`), given the full `current_plan` and the consolidated WEAKNESSES & GAPS from 4a-ii, instructed to return the complete revised plan with [CHANGED] and [NEW] markers on modified or added sections. Do not address [Upstream] items in the revision. Keeping revision as one coherent pass (rather than fanning it out per dimension) prevents conflicting edits to the same plan sections.
+Dispatch a single `Agent` call (`subagent_type="general-purpose"`), given the full `current_plan` and the consolidated WEAKNESSES & GAPS from 4a-ii, instructed to return the complete revised plan with [CHANGED] and [NEW] markers on modified or added sections. Do not address [Upstream] or [Decision-pending] items in the revision. Keeping revision as one coherent pass (rather than fanning it out per dimension) prevents conflicting edits to the same plan sections.
+
+Include this constraint in the reviser prompt verbatim; without it the reviser resolves findings by adding machinery, which is the channel through which small plans balloon:
+
+> Fix only the listed findings. Never add a section, gate, state machine, role table, owner assignment, or measurement scheme that no listed finding names. Prefer deleting or tightening over adding. When a fix can be a sentence, it is not a subsection. Leave sections marked as open decisions untouched.
 
 #### 4b. Parse results
 
@@ -161,6 +188,7 @@ From the synthesized critique (4a-ii) and the generated revision (4a-iii), extra
 - Yellow plan-fixable items (with labels)
 - Green items (noted but not scored)
 - Upstream items (with labels and root causes)
+- Decision-pending items (with labels)
 - Verdict (APPROVE or REVISE)
 - Revised plan text (if REVISE)
 
@@ -168,11 +196,11 @@ From the synthesized critique (4a-ii) and the generated revision (4a-iii), extra
 
 `score = -(3 * count(Red_plan_fixable) + 1 * count(Yellow_plan_fixable))`
 
-Upstream items are excluded from the score. They cannot be fixed by plan revision and should not drive iteration.
+Upstream and Decision-pending items are excluded from the score. Neither can be fixed by plan revision and neither should drive iteration.
 
-#### 4d. Accumulate upstream items
+#### 4d. Accumulate upstream and decision-pending items
 
-Add any new upstream items to the running list. Deduplicate by semantic similarity against existing items (same root cause = same item, even if worded differently).
+Add any new upstream and decision-pending items to their running lists. Deduplicate by semantic similarity against existing items (same root cause = same item, even if worded differently).
 
 #### 4e. Record pass
 
@@ -181,6 +209,7 @@ Add to `pass_history`:
 {
   pass: N,
   score: <computed>,
+  lines: <line count of the plan this pass reviewed>,
   red_labels: [...],
   yellow_labels: [...],
   fixed_from_prev: [...],  // labels present in pass N-1 but absent now
