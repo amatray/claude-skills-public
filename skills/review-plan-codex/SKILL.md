@@ -1,6 +1,6 @@
 ---
 name: review-plan-codex
-description: Use when the user wants an external second opinion on a plan from GPT-5.5 Pro via codex, or says "send the plan to GPT", "get ChatGPT to review my plan", "codex review of the plan", "external review of the plan", "second opinion on the plan from GPT-5.5", "/review-plan-codex", or wants a cross-model critique round run as a standalone step on any plan (not just empirical Bob plans). Codex runs the convergence loops; Claude supplies the independent critique; each model's findings are audited by the other.
+description: Use when the user wants an external second opinion on a plan from the strongest available ChatGPT model via codex, or says "send the plan to GPT", "get ChatGPT to review my plan", "codex review of the plan", "external review of the plan", "second opinion on the plan from GPT", "/review-plan-codex", or wants a cross-model critique round run as a standalone step on any plan (not just empirical Bob plans). Codex runs the convergence loops; Claude supplies the independent critique; each model's findings are audited by the other.
 argument-hint: "[file:path] [skip-internal] [skip-final] [local] [help]"
 allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Skill", "Agent"]
 ---
@@ -15,7 +15,7 @@ judgment is where model diversity pays.** The multi-pass convergence loops run
 on Codex (`codex exec` against the Codex-side `$review-plan-auto` skill,
 ChatGPT Pro entitlement, no per-call cost). Claude contributes exactly one
 fresh-context critique of the GPT-converged plan; that is where the second
-model family earns its keep. GPT-5.5 then audits Claude's findings, so each
+model family earns its keep. The GPT side then audits Claude's findings, so each
 model's judgment is checked by the other. Claude tokens are spent only on
 orchestration, the single critique pass, and edit application.
 
@@ -197,8 +197,8 @@ GPT-converged plan by a different model family. One pass, no loop.
 
 ## Stage 3: Codex triage of Claude's findings
 
-GPT-5.5 audits the Stage 2 findings against the plan. Findings survive only
-with a recorded validity verdict.
+The GPT-side model audits the Stage 2 findings against the plan. Findings
+survive only with a recorded validity verdict.
 
 1. Build the triage prompt per `codex-transport.md`: the content of
    `references/codex-triage-prompt.md`, the same context briefing, the full
