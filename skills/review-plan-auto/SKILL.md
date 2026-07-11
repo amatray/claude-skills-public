@@ -105,6 +105,7 @@ In a single message, dispatch one `Agent` call (`subagent_type="general-purpose"
 4. The upstream/plan-fixable classification instruction
 5. Prior-pass issue summary (compact: labels + statuses only, not full critique text) so labels stay consistent across passes
 6. The per-dimension critique output format
+7. The anchoring rule
 
 Dimension 7 is conditional: include its subagent only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. Otherwise dispatch the 6 core dimensions and treat dimension 7 as "n/a".
 
@@ -138,12 +139,14 @@ Dimension 7 is conditional: include its subagent only when the plan mentions Adv
 > [Green] [Plan-fixable] [Short-Label] — [Issue] → Fix: [Recommendation]
 > (Use consistent short labels across passes so issues can be tracked.)
 
-**Fan-out fallback:** If subagent dispatch isn't available, or any per-dimension dispatch fails, perform the full-dimension critique inline using this critic stance:
+**Anchoring rule (subagent and inline paths alike):** every Red or Yellow finding must name or quote the specific plan step or section it concerns; a finding about an omission must state "absent from plan". A finding that cannot be anchored this way is not reportable: unanchored critique is how generic, plausible-sounding filler enters a review.
+
+**Inline critique (`quick` depth, or fallback):** At `depth:quick`, skip the fan-out entirely and perform the full-dimension critique inline (the subagent fan-out is where most of each pass's time and token cost sits, so a quick run that keeps it is not quick). Also use the inline path if subagent dispatch isn't available or any per-dimension dispatch fails. Either way, use this critic stance:
 > You are now the critic, not the planner. Do not rationalize. Your job is to find what's missing, what will break, and what's wishful thinking.
 
 #### 4a-ii. Synthesize critique
 
-Merge the per-dimension findings into one consolidated review: collect strengths, dedupe overlapping issues across dimensions, normalize short labels against the prior-pass labels so the same issue keeps the same label, and sort by severity. Then set the verdict:
+Merge the per-dimension findings into one consolidated review: collect strengths, dedupe overlapping issues across dimensions, normalize short labels against the prior-pass labels so the same issue keeps the same label, and sort by severity. No subagent Red may be dropped or downgraded during the merge: every Red either appears in the consolidated review or is merged into a duplicate with the dedup stated ("also flagged by [dimension]"). The synthesizing agent may have helped write the plan, and silently softening Reds is the channel through which planner bias re-enters an otherwise fresh-context review. Then set the verdict:
 - **APPROVE** if no Red plan-fixable issues remain.
 - **REVISE** otherwise.
 
