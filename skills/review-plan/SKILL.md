@@ -6,7 +6,7 @@ allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Agent", "WebSe
 ---
 # Plan Review
 
-*v1.3 — Stress-test a plan with structured expert critique, best-practice research, and parallel fresh-context subagent review*
+*v1.4 — Stress-test a plan with structured expert critique, best-practice research, and parallel fresh-context subagent review*
 
 Stress-test a plan with structured expert critique, web research on best practices, and a revised version if needed. Use after developing a plan, or on any plan file. Catches blind spots, missing steps, and wishful thinking.
 
@@ -84,7 +84,7 @@ Issue the searches as parallel calls in a single message (they are independent),
 In a single message, dispatch one `Agent` call per dimension (`subagent_type="general-purpose"`) so they run concurrently. This avoids planner bias and runs the dimensions in parallel. Each per-dimension prompt contains:
 - The full plan text
 - The best practices distilled from Step 3
-- EXACTLY ONE of the 6 dimensions below (its definition and the critic stance)
+- EXACTLY ONE of the active dimensions below (its definition and the critic stance)
 - The classification rule (Red/Yellow/Green) and the anchoring rule
 - Instruction to return findings for that dimension only, in this format:
 
@@ -95,15 +95,17 @@ In a single message, dispatch one `Agent` call per dimension (`subagent_type="ge
 > [Yellow] [Label] — [Issue] → Fix: [Recommendation]
 > [Green] [Label] — [Issue] → Fix: [Recommendation]
 
+Dimension 7 is conditional: dispatch its subagent only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. Otherwise dispatch the 6 core dimensions and treat dimension 7 as "n/a".
+
 **Synthesis:** Once all subagents return, merge their findings — collect strengths, dedupe overlapping issues across dimensions, and sort by severity (Red → Yellow → Green). This consolidated set feeds Step 5. No subagent Red may be dropped or downgraded during the merge: every Red either appears in the output or is merged into a duplicate with the dedup stated ("also flagged by [dimension]"). The synthesizing agent may have helped write the plan, and silently softening Reds is the channel through which planner bias re-enters an otherwise fresh-context review.
 
 **Inline review (`quick` depth, or fallback):**
-At `depth:quick`, skip the fan-out entirely and perform the review inline across all 6 dimensions using the critic stance below; the subagent fan-out is where most of the time and token cost sits, so a quick run that keeps it is not quick. Also use the inline path if subagent dispatch isn't available or any per-dimension dispatch fails.
+At `depth:quick`, skip the fan-out entirely and perform the review inline across all active dimensions using the critic stance below; the subagent fan-out is where most of the time and token cost sits, so a quick run that keeps it is not quick. Also use the inline path if subagent dispatch isn't available or any per-dimension dispatch fails.
 
 **CRITIC STANCE:**
 > You are now the critic, not the planner. Do not rationalize. Your job is to find what's missing, what will break, and what's wishful thinking.
 
-Review against 6 dimensions:
+Review against these dimensions (7 is conditional):
 
 **1. Pre-mortem** — "It's 3 months later and this plan failed. What were the top 3 causes?"
 
@@ -116,6 +118,8 @@ Review against 6 dimensions:
 **5. Sequencing** — Are there hidden blockers? Would reordering reduce risk?
 
 **6. Specificity** — Could someone unfamiliar execute each step?
+
+**7. Adversarial-agent contract** (conditional): fires only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. In the dimension-7 reviewer prompt, give the path `~/.claude/preferences/adversarial-agent-contract.md` and instruct the reviewer to Read that file and apply its full detection patterns and contract requirements; flag as violations: conditional-gating language near an agent spec without a sibling `cannot_do_job:` block, a missing closed `slo_enum` declaration or `role_invocation_audit.json` emission, missing task-specific cost-benefit push-back, and any undeclared dispatch mode or documented fallback. Each violation is a [Red] finding. If the plan does not mention any of the trigger terms, this dimension reports "n/a".
 
 **Classify findings:**
 - **Red** — Critical. Will likely cause failure if unaddressed.
