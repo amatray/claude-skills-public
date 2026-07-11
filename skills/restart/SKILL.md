@@ -128,6 +128,25 @@ Write the file to `$PROJECT_ROOT/restart.md` using the template below. Replace a
 
 ---
 
+## Session recap
+<!-- Scannable headline; details in the sections below. -->
+
+**Created**
+- `{path}`: {purpose}
+
+**Sent** (omit this group if nothing was sent)
+- {recipient / subject}: ID {message-id}
+
+**Waiting on {party}**
+- {item}
+
+**Ready, not started**
+- {immediate next action}
+
+{one-line sign-off}
+
+---
+
 ## Git State
 - **Branch**: {branch}
 - **Last commit**: {hash} {message}
@@ -185,6 +204,38 @@ Write the file to `$PROJECT_ROOT/restart.md` using the template below. Replace a
 
 For the `{encoded-dir}` placeholder in the resume prompt, derive it from the current working directory: replace `/` with `-` (e.g., `/Users/adrienmatray` → `-Users-adrienmatray`). If unsure, leave the literal `<encoded-dir>` in the prompt; the fresh Claude can resolve it.
 
+### Prepend the recap to SESSION_LOG.md
+
+After restart.md is written, add the same recap to a running log so it accumulates across sessions. `SESSION_LOG.md` is a persistent CHANGELOG-style file (newest entry on top), the narrative companion to `PROJECT_MEMORY.md`, and is exempt from Hard Rule #13.
+
+1. If `$PROJECT_ROOT/SESSION_LOG.md` does not exist, create it with a header:
+
+```
+# Session Log: {project name}
+
+Newest session on top. Each entry is a session recap: what was created, what was sent, what we are waiting on, and what is ready next. Running narrative companion to PROJECT_MEMORY.md. CHANGELOG style, so it accumulates.
+```
+
+2. Prepend a new dated entry directly under the header, above any existing entries, using the Session recap block with a `## {YYYY-MM-DD}` header (`date -u +%Y-%m-%d`):
+
+```
+## {YYYY-MM-DD}
+
+**Created**
+- `{path}`: {purpose}
+
+**Sent** (omit if nothing was sent)
+- {recipient / subject}: ID {message-id}
+
+**Waiting on {party}**
+- {item}
+
+**Ready, not started**
+- {immediate next action}
+```
+
+Read the existing file first, then write it back with the new entry inserted after the header block. Do not rewrite or dedupe older entries; the log is append-only at the top.
+
 ## Step 7 — Check .gitignore coverage
 
 Check whether `restart.md` and `batch_logs/` are covered by `.gitignore`. If either is NOT covered, display the exact lines the user should add:
@@ -196,14 +247,16 @@ batch_logs/
 
 Do not modify `.gitignore` automatically.
 
+`SESSION_LOG.md` is persistent project documentation, so it is not gitignored by default; it is meant to live alongside the code. For a project flagged as confidential, note that `SESSION_LOG.md` can reference external correspondence and should be reviewed before it reaches any remote.
+
 ## Step 8 — Confirm and prompt the user to clear
 
 Tell the user, in this order:
 
-1. The absolute path where `restart.md` was written.
+1. The absolute path where `restart.md` was written, and that the recap was prepended to `SESSION_LOG.md`.
 2. The resume prompt, displayed in a copy-able block (the same block that's inside the file's `> Resume prompt` quote).
 3. A one-line instruction:
 
 > Copy the resume prompt above, then type `/clear` in this conversation, then paste the resume prompt as your first message in the fresh conversation.
 
-That ends the skill. The user runs `/clear` themselves — the skill cannot do it.
+That ends the skill. The user runs `/clear` themselves; the skill cannot do it.
