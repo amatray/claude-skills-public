@@ -10,6 +10,8 @@ allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Agent", "WebSe
 
 Stress-test a plan with structured expert critique, web research on best practices, and a revised version if needed. Use after developing a plan, or on any plan file. Catches blind spots, missing steps, and wishful thinking.
 
+**Parity note:** the flag table, plan-location tiers, role table, research queries, review dimensions, classification, and anchoring rule are mirrored with `review-plan-auto/SKILL.md`. When editing any shared section, apply the same edit to the other skill.
+
 ## Instructions
 
 ### Step 0: Pre-checks

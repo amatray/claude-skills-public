@@ -6,9 +6,11 @@ allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Agent", "WebSe
 ---
 # Automated Plan Review
 
-*v1.1 — Iterative plan review with convergence-based stopping, deterioration detection, and upstream-fix classification. Each pass fans out the dimensions across parallel subagents, then generates one coherent revision*
+*v1.2 — Iterative plan review with convergence-based stopping, deterioration detection, and upstream-fix classification. Each pass fans out the dimensions across parallel subagents, then generates one coherent revision*
 
-Runs the structured plan critique loop automatically (up to N passes) until the plan has no critical issues. Each pass uses a fresh-context subagent to avoid planner bias. Detects circular changes and surfaces issues that belong upstream rather than in the plan.
+Runs the structured plan critique loop automatically (up to N passes) until the plan has no critical issues. Each pass uses fresh-context subagents to avoid planner bias (except at `depth:quick`, which reviews inline). Detects circular changes and surfaces issues that belong upstream rather than in the plan.
+
+**Parity note:** the flag table, plan-location tiers, role table, research queries, review dimensions, classification, and anchoring rule are mirrored with `review-plan/SKILL.md`. When editing any shared section, apply the same edit to the other skill.
 
 ## Instructions
 
@@ -22,7 +24,7 @@ Parse `$ARGUMENTS` for flags. **If `$ARGUMENTS` is `help`, print the table below
 | File path | `file:path` | Auto-detect | Explicit plan location |
 | Expert role | `role:"..."` | Auto-detect | Override persona |
 | Focus area | `focus:dimension` | All dimensions | Weight one dimension (e.g. `focus:feasibility`) |
-| Depth | `depth:quick/standard/deep` | `standard` | Web research intensity |
+| Depth | `depth:quick/standard/deep` | `standard` | Web research intensity + review mode (`quick` = inline critique, no subagent fan-out) |
 | Quick | `quick` | Off | Shorthand for `depth:quick` |
 | Max passes | `max:N` | `4` | Hard cap on automated passes |
 | Dry run | `dryrun` | Off | Show role + research plan only |
@@ -39,6 +41,11 @@ If no plan found:
 > "No plan found. Usage: `/review-plan-auto` (after plan mode) or `/review-plan-auto file:path/to/plan.md`"
 
 Record the plan source (file path or "conversation") for the final summary.
+
+**Announce the resolved source before doing anything else.** When the plan was auto-detected (tier 2, 3, or 4), state it in chat before Step 2, so a wrong match is caught before any research or subagent cost is spent:
+> "**Plan under review:** `path/to/plan.md` (auto-detected; pass `file:` to override)"
+
+For tier 4, say "plan from this conversation" instead of a path. Then proceed without waiting; the user can interrupt if the match is wrong.
 
 ### Step 2: Assign Expert Role
 
