@@ -63,7 +63,7 @@ The Codex-side skill ends its final message with a single machine-parseable
 line:
 
 ```
-CONVERGENCE: verdict=<APPROVE|REVISE> exit=<clean|approve|deterioration|regression|marginal|hard-cap> score=<N> passes=<K>/<MAX>
+CONVERGENCE: verdict=<APPROVE|REVISE> exit=<inflation|clean|approve|deterioration|regression|marginal|hard-cap> score=<N> passes=<K>/<MAX>
 ```
 
 Extract it directly from the raw output:
