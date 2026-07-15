@@ -32,10 +32,10 @@ Parse `$ARGUMENTS` for flags. **If `$ARGUMENTS` is `help`, print the table below
 ### Step 1: Locate and Read the Plan
 
 Four-tier priority:
-1. **Explicit file** — `file:path/to/plan.md` argument
-2. **Project-local plans** — search for `plan*.md` files in the current project's `notes/`, `plans/`, or `pap/` subdirectories (including additional working directories). Prefer the most recently modified match.
-3. **Plan-mode file** — most recent file in `~/.claude/plans/`
-4. **Conversation history** — scan the current session for the plan
+1. **Explicit file**: `file:path/to/plan.md` argument
+2. **Project-local plans**: search for `plan*.md` files in the current project's `notes/`, `plans/`, or `pap/` subdirectories (including additional working directories). Prefer the most recently modified match.
+3. **Plan-mode file**: most recent file in `~/.claude/plans/`
+4. **Conversation history**: scan the current session for the plan
 
 If no plan found:
 > "No plan found. Usage: `/review-plan-auto` (after plan mode) or `/review-plan-auto file:path/to/plan.md`"
@@ -90,7 +90,7 @@ Extract the plan's primary domain and approach. Build web search queries:
 
 | Depth | Web searches |
 |-------|-------------|
-| `quick` | 0 — skip entirely |
+| `quick` | 0 (skip entirely) |
 | `standard` | 2 (queries A + B) |
 | `deep` | 3-4 (all queries) |
 
@@ -129,21 +129,21 @@ If the workflow returns `status: "error"` or the return value is unusable, say s
 
 **The 8 review dimensions:**
 
-1. **Pre-mortem** — "It's 3 months later and this plan failed. What were the top 3 causes?"
-2. **Completeness** — What's missing that a domain expert would expect?
-3. **Feasibility** — Are there steps that depend on unconfirmed resources or approvals?
-4. **Best-practice alignment** — How does this compare to standards from the research?
-5. **Sequencing** — Are there hidden blockers? Would reordering reduce risk?
-6. **Specificity** — Could someone unfamiliar execute each step?
-7. **Adversarial-agent contract** — Conditional, fires only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. The reviewer must Read `~/.claude/preferences/adversarial-agent-contract.md` and apply its full detection patterns and contract requirements; flag as violations: conditional-gating language near an agent spec without a sibling `cannot_do_job:` block, a missing closed `slo_enum` declaration or `role_invocation_audit.json` emission, missing task-specific cost-benefit push-back, and any undeclared dispatch mode or documented fallback. Each violation is a [Red] [Plan-fixable] issue. If the plan does not mention any of the trigger terms, this dimension is not dispatched and contributes nothing to the score.
+1. **Pre-mortem**: "It's 3 months later and this plan failed. What were the top 3 causes?"
+2. **Completeness**: What's missing that a domain expert would expect?
+3. **Feasibility**: Are there steps that depend on unconfirmed resources or approvals?
+4. **Best-practice alignment**: How does this compare to standards from the research?
+5. **Sequencing**: Are there hidden blockers? Would reordering reduce risk?
+6. **Specificity**: Could someone unfamiliar execute each step?
+7. **Adversarial-agent contract**: Conditional, fires only when the plan mentions Adversary / Verifier / audit-readiness / determinism / sensitivity / robustness agents. The reviewer must Read `~/.claude/preferences/adversarial-agent-contract.md` and apply its full detection patterns and contract requirements; flag as violations: conditional-gating language near an agent spec without a sibling `cannot_do_job:` block, a missing closed `slo_enum` declaration or `role_invocation_audit.json` emission, missing task-specific cost-benefit push-back, and any undeclared dispatch mode or documented fallback. Each violation is a [Red] [Plan-fixable] issue. If the plan does not mention any of the trigger terms, this dimension is not dispatched and contributes nothing to the score.
 
 8. **Proportionality**: Always on; this is the counterweight to the gap-finding dimensions, which can only ever push a plan to grow. What in this plan is more process than its stakes justify? Flag as findings: sections whose deletion would not change the outcome, restatements of rules the standing environment already enforces, and machinery (gates, state machines, role tables, owners, measurement windows) that serves no named failure mode. Over-engineering findings are classified Red/Yellow plan-fixable like any other, and their fix is deletion or tightening, never addition.
 
 **Classification instruction (passed verbatim as the `classification` arg):**
 
 > For each issue found, classify its **fixability** alongside its severity:
-> - **[Plan-fixable]** — The plan text can be revised to address this (add a step, clarify a section, reorder, add a contingency).
-> - **[Upstream]** — This issue originates outside the plan: inconsistent naming conventions across project files, input data format mismatches, tool configuration problems, missing upstream decisions, or infrastructure constraints. Revising the plan cannot fix the root cause; it must be addressed elsewhere. Do NOT generate fix recommendations for upstream issues.
+> - **[Plan-fixable]**: The plan text can be revised to address this (add a step, clarify a section, reorder, add a contingency).
+> - **[Upstream]**: This issue originates outside the plan: inconsistent naming conventions across project files, input data format mismatches, tool configuration problems, missing upstream decisions, or infrastructure constraints. Revising the plan cannot fix the root cause; it must be addressed elsewhere. Do NOT generate fix recommendations for upstream issues.
 > - **[Decision-pending]**: The issue concerns a choice the plan explicitly leaves open for the user (a section titled "Open decisions", "Open questions", or equivalent). An open decision is a feature of the plan, not a gap: report it so the user sees it, but do NOT generate a fix, and do NOT propose process machinery to manage the openness.
 >
 > Examples of upstream issues: folder names use mixed conventions (backslash vs underscore vs space), input data arrives in inconsistent formats, a dependency has not been configured yet, a decision by another team is pending.

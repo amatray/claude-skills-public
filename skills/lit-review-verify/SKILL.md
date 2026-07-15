@@ -73,7 +73,7 @@ Read any .bib file(s). For each citation key, extract: title, author, year, jour
 Use immutable URI mode to avoid locking conflicts:
 
 ```bash
-sqlite3 "file:/Users/adrienmatray/Zotero/zotero.sqlite?mode=ro&immutable=1"
+sqlite3 "file:$HOME/Zotero/zotero.sqlite?mode=ro&immutable=1"
 ```
 
 For citations WITH a DOI (from .bib), batch-query by DOI. For citations WITHOUT a DOI, use title matching (normalize: strip `{}` braces, lowercase, collapse whitespace, use `LIKE`). For .md files with only author/year, query by author last name + year.
@@ -143,8 +143,8 @@ Assign a verdict to each pair:
 After abstract-based verification, revisit any citation with verdict **UNCERTAIN** or **PARTIAL** that has a PDF in Zotero. The goal is to upgrade the verdict using the actual paper content.
 
 **How to resolve PDF paths:** Zotero stores paths in two formats:
-- `attachments:` prefix: Replace with `/Users/adrienmatray/Library/CloudStorage/Dropbox-Matray/Adrien Matray/Zotero_Library/`
-- `storage:` prefix: Find the actual file with `find /Users/adrienmatray/Zotero/storage -name "FILENAME"` where FILENAME is the part after `storage:`
+- `attachments:` prefix: Replace with `~/Library/CloudStorage/Dropbox-Matray/Adrien Matray/Zotero_Library/`
+- `storage:` prefix: Find the actual file with `find ~/Zotero/storage -name "FILENAME"` where FILENAME is the part after `storage:`
 
 **Run PDF checks in parallel using agents.** For each UNCERTAIN/PARTIAL citation with a PDF, spawn an Agent with:
 - The exact claim text and its location
