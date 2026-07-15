@@ -26,7 +26,7 @@ Parse `$ARGUMENTS` for flags. **If `$ARGUMENTS` is `help`, print the table below
 | Focus area | `focus:dimension` | All dimensions | Weight one dimension (e.g. `focus:feasibility`) |
 | Depth | `depth:quick/standard/deep` | `standard` | Web research intensity + review mode (`quick` = inline critique, no fan-out) + reviewer effort (`standard` = medium, `deep` = high) |
 | Quick | `quick` | Off | Shorthand for `depth:quick` |
-| Max passes | `max:N` | `3` | Hard cap on passes (pass 1 reviews and revises; passes 2..N verify and re-revise) |
+| Max passes | `max:N` | `4` | Hard cap on passes (pass 1 reviews and revises; passes 2..N verify and re-revise) |
 | Dry run | `dryrun` | Off | Show role + research plan only |
 
 ### Step 1: Locate and Read the Plan
@@ -115,7 +115,7 @@ Invoke the `Workflow` tool with `scriptPath` set to `<this skill's base director
 | `anchoring` | The anchoring rule below, verbatim |
 | `reviserConstraint` | The reviser constraint below, verbatim |
 | `focus` | The `focus:` flag value, or `null` |
-| `maxPasses` | The `max:` flag value (default 3) |
+| `maxPasses` | The `max:` flag value (default 4) |
 | `reviewEffort` | `"medium"` at `depth:standard`, `"high"` at `depth:deep` |
 
 The script owns the loop mechanics deterministically: it fans all dimension reviewers out in one `parallel()` call, merges findings by label in code (plus one cheap clustering agent when more than 8 findings survive, since different reviewers name the same defect differently), dispatches one coherent revision agent (effort `high`; if fixing everything would blow the size cap, it retries with Reds only and defers the Yellows to the report), then runs verification passes (effort `medium`) in which each dimension's verifier checks only its own prior findings against the revised plan and may add new Reds only for failure modes the revision itself introduced. It stops on: converged (all Reds verified fixed, no new ones), churn (a fixed issue reappears; the plan rolls back is not applied further), inflation (a revision would exceed 1.25x the original line count, with a 30-line headroom floor so tiny plans stay revisable; the revision is rejected and its findings are returned under `notApplied`), or the hard cap. Yellows are fixed in the pass-1 revision but never drive iteration. The workflow runs in the background; wait for its completion notification, then use its return value in Step 5. Do not dispatch any review agents yourself while it runs.
