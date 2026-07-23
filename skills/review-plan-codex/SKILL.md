@@ -86,6 +86,10 @@ Stage 1; it is the source of truth for both codex call shapes (loop and
 triage), shell-quoting of `$review-plan-auto`, response extraction, the
 `CONVERGENCE:` line grammar, the fixes schema, and the sad-path branches.
 
+Read `gotchas.md` before Stage 1 and before Stage 4: it holds the rationalization
+table, the red-flags list, and the measured run behind the wall-clock bounds and
+the deterministic Stage 4.
+
 ## Stage 0: Locate the plan, set names, preflight
 
 1. Parse `$ARGUMENTS`. If `help`, print the flag table below and stop.
@@ -224,13 +228,11 @@ survive only with a recorded validity verdict.
    `run_in_background: true` and wait for the completion notification, exactly
    as Stage 1 does. Stdout to `$TRIAGE_RAW`.
 
-   This call was previously foreground with `timeout: 300000` on the assumption
-   that a single-shot triage runs 1 to 3 minutes. Observed on 2026-07-23: a
-   24-finding triage exceeded 300 seconds and was shunted to the background
-   mid-call, which leaves the caller unsure whether it failed or is still
-   working. Background launch removes the ambiguity. Apply the same 20-minute
-   bound as Stage 1; on breach, record `triage: TIMEOUT` and take the degraded
-   self-triage path in step 2, disclosing it.
+   Single-shot does not mean fast: a triage over two dozen findings runs past
+   five minutes. Background launch keeps a slow call distinguishable from a
+   failed one. Apply the same 20-minute bound as Stage 1; on breach, record
+   `triage: TIMEOUT` and take the degraded self-triage path in step 2,
+   disclosing it.
 2. Extract the response (last `^codex$` to `^tokens used$`, strip `^hook: `
    lines) and validate the headers `## Triage table` and
    `## Fix recommendations`. On non-zero exit or malformed output: perform the
@@ -288,22 +290,13 @@ The five assertions are: every applied fix's new text is present; code fences
 balance; no section heading is duplicated; the first non-blank line is still a
 level-1 heading; and the line count is within budget of `$POSTFIX`.
 
-**Why this is not a model call.** Through 2026-07-23 this stage re-ran the
-Codex convergence loop with `max:2` and the parenthetical intent "a consistency
-check, not a fresh full review". That intent lived in this file and was never
-transmitted: the prompt sent was `$review-plan-auto file:<path> max:2`, so
-Codex ran a full review, correctly, because that is what it was asked. `max:2`
-bounds passes, not edits per pass or wall clock, and a pass can rewrite the
-whole document. The observed run took 28 minutes, emitted 2.7 MB, moved the
-plan from 526 to 810 lines before trimming to 718, never produced a
-`CONVERGENCE:` verdict, and had to be killed. Checking afterward, **all 17
-applied fixes had been rewritten**: none survived verbatim. The stage meant to
-verify the edits had silently replaced them, destroying the audit trail while
-the substance mostly survived in paraphrase.
-
-The lesson generalizes past this stage: an instruction that lives only in the
-caller's prose is not a constraint on the callee. If a bound matters, it goes
-in the transmitted prompt or in a deterministic check, never in a parenthetical.
+**Why this is a script and not a model call.** A model asked to check a
+document will improve it, and an improvement here is indistinguishable from
+the corruption the stage exists to detect: a stage that rewrites the fixes it
+was asked to confirm destroys the audit trail linking each triaged finding to
+its edit, while leaving the plan looking fine. The check must therefore be
+incapable of editing. `gotchas.md` records the run that establishes this,
+including the measured cost.
 
 ## Output to the user (end of run)
 

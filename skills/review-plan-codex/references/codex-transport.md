@@ -55,7 +55,9 @@ directory, and the loop must be able to write `$PLAN_PATH` in place.
 
 **Timing:** a multi-pass loop runs well past foreground Bash timeouts. Launch
 with `run_in_background: true` and wait for the completion notification; do
-not poll with sleep.
+not poll with sleep. Bound it at 20 minutes: past that the loop is rewriting
+rather than converging, so stop the task and record `loop1: TIMEOUT` per
+SKILL.md Stage 1 rather than waiting it out or relaunching.
 
 ### Loop verdict extraction
 
@@ -80,8 +82,12 @@ empty, apply sad-path S3 below.
 ## Call shape B: triage (single-shot, read-only)
 
 Sends the plan plus Claude's Stage 2 review to the GPT-side model for
-adversarial triage. Synchronous, 1-3 min typical; run foreground with an
-explicit `timeout: 300000` (5 min) on the Bash call.
+adversarial triage. Single-shot, but not fast: a triage over two dozen findings
+runs past five minutes. Launch it with `run_in_background: true` and wait for
+the completion notification, like the loop call, under the same 20-minute
+bound. A foreground timeout short enough to fire mid-call is worse than none,
+because a call shunted to the background is indistinguishable from a failed one
+at the moment it happens.
 
 ```bash
 FULL_PROMPT="$(cat ~/.claude/skills/review-plan-codex/references/codex-triage-prompt.md)
@@ -201,11 +207,13 @@ no response after them. Check all three before treating a call as successful.
 
 | # | Trigger | Branch |
 |---|---|---|
-| S1 | Preflight non-zero (codex unreachable) | Switch the whole run to `local` mode; record stderr verbatim; disclose in report. |
+| S1 | Preflight non-zero (codex unreachable) | Switch the whole run to `local` mode; record stderr verbatim; disclose in report. Stage 4 is unaffected: it is a script. |
 | S2 | Loop call fails (per failure detection above) | Run the local `review-plan-auto` Skill for that stage; record `loop: LOCAL` + reason; disclose. |
+| S2b | Stage 1 loop or triage exceeds the 20-minute bound | Stop the task. Record `loop1: TIMEOUT` or `triage: TIMEOUT` with elapsed minutes and the plan's line count. Continue on what is on disk. Do NOT relaunch and do NOT treat it as a transport failure warranting `local`: the bound produced a result. |
 | S3 | `CONVERGENCE:` line absent but loop evidence present (final summary in raw output, plan mtime changed) | Record `verdict=UNPARSED` plus the summary's exit-reason line verbatim; continue. No evidence at all = treat as S2. |
 | S4 | Triage call fails (per failure detection above) or headers missing | Claude performs the triage itself, skeptically; record `triage: LOCAL` + reason; report flags the degraded cross-model audit. |
 | S5 | `TOKEN_ESTIMATE` > ~150k | Note the size warning in the report and proceed (unattended runs do not stop to ask). |
 | S6 | Every finding INVALID at triage | Record "no plan-fixable issues survived triage"; skip Stage 4; report both models' verdicts. |
 | S7 | An edit block's old-text does not match the plan (drift) | Skip that block, record it under Drifted blocks, continue with the rest. |
 | S8 | Confidential markers detected in the plan | ABORT loud before any codex call; name what was detected and where. |
+| S9 | Stage 4 `verify-applied-fixes.py` exits non-zero | Record the `VERIFY: verdict=FAIL reason=<CODE>` line verbatim and report it. There is no fallback and no retry: a script failure is a finding about Stage 3's edits, not a transport problem. Do not "verify by reading the plan yourself"; that is the collapse this skill exists to prevent. `FIX_NOT_APPLIED` usually means `$FIXES_FILE` was written as prose instead of `### Fix N` blocks with fences. |
