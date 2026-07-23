@@ -48,7 +48,11 @@ collapses the cross-model design back into a single model.
 |---|---|---|
 | Stage 1 loop | `codex exec` run of `$review-plan-auto` (or the disclosed `local` fallback) | `loop1: CODEX` + its `CONVERGENCE:` line |
 | Stage 3 triage | `codex exec` run of the triage prompt (or the disclosed `local` fallback) | `triage: CODEX` + the triage table |
-| Stage 4 loop | `codex exec` run of `$review-plan-auto` (or the disclosed `local` fallback) | `loop2: CODEX` + its `CONVERGENCE:` line |
+| Stage 4 verify | `scripts/verify-applied-fixes.py` exiting 0 | `verify: SCRIPT` + its `VERIFY:` line |
+
+Stage 4 is a deterministic script, not a model call, so it has no `local`
+fallback and cannot be satisfied by reading the plan yourself. A run where the
+script was not executed has no Stage 4 proof.
 
 Stage 2 has its own gate: the critique must come from a fresh-context Agent
 dispatch, not from you reviewing inline (inline is a disclosed fallback only).
@@ -111,7 +115,7 @@ triage), shell-quoting of `$review-plan-auto`, response extraction, the
    REVIEW_FILE="$OUT_DIR/${BASE}_claude_review_${DATE}.md"
    TRIAGE_RAW="$OUT_DIR/${BASE}_codex_triage_raw_${DATE}.txt"
    FIXES_FILE="$OUT_DIR/${BASE}_codex_fixes_${DATE}.md"
-   LOOP2_RAW="$OUT_DIR/${BASE}_codex_loop2_raw_${DATE}.txt"
+   POSTFIX="$OUT_DIR/${BASE}_post_fixes_${DATE}.md"
    BACKUP="$OUT_DIR/${BASE}_pre_codex_${DATE}.md"
    ```
 
@@ -137,6 +141,8 @@ Skip if `skip-internal`.
 Run the full iterative review-plan-auto loop on Codex so the plan converges
 before the independent critique round is spent on it.
 
+0. Record `wc -l "$PLAN_PATH"` before launching. Stage 1 rewrites in place, so
+   this is the only chance to measure what it did.
 1. Invoke per the loop call shape in `codex-transport.md`: working directory
    `$PLAN_DIR` (workspace-write must cover the plan file), sandbox
    `workspace-write`, prompt `$review-plan-auto file:$PLAN_PATH` (single-quote
@@ -144,10 +150,22 @@ before the independent critique round is spent on it.
    `$LOOP1_RAW`. Launch with `run_in_background: true` and wait for the
    completion notification; a multi-pass loop routinely outruns foreground
    Bash timeouts. Do not poll with sleep.
+
+   **Wall-clock bound: 20 minutes.** A convergence loop that has not returned
+   by then is not converging, it is rewriting. On breach, stop the task, record
+   `loop1: TIMEOUT` with elapsed minutes and the plan's line count in
+   `$FIXES_FILE`, and continue to Stage 2 on whatever is on disk. Do not
+   relaunch and do not fall back to `local`: a timeout is a bounded result, not
+   a transport failure. Disclose it in the final report.
 2. On completion, extract the `CONVERGENCE:` line (grammar in
    `codex-transport.md`) and record `loop1: CODEX` plus that line in
    `$FIXES_FILE`. The loop writes its revision to `$PLAN_PATH` in place; let
    it. The revised plan is the Stage 2 input unconditionally.
+
+   Record the after line count next to the before count. Growth past 25 percent
+   goes in the final report as a flagged number, because a pre-clean loop that
+   inflates the plan by a quarter has done something other than clean it. This
+   is a disclosure, not a gate: Stage 2 still reviews what Stage 1 produced.
 3. Sad paths (full table in `codex-transport.md`): non-zero exit means run the
    local `review-plan-auto` Skill fallback with disclosure; a missing
    `CONVERGENCE:` line with clear evidence the loop ran (summary present, plan
@@ -202,9 +220,17 @@ survive only with a recorded validity verdict.
 
 1. Build the triage prompt per `codex-transport.md`: the content of
    `references/codex-triage-prompt.md`, the same context briefing, the full
-   plan, and the full `$REVIEW_FILE`. Invoke codex read-only, foreground,
-   explicit `timeout: 300000` (single-shot call, 1-3 min typical). Stdout to
-   `$TRIAGE_RAW`.
+   plan, and the full `$REVIEW_FILE`. Invoke codex read-only with
+   `run_in_background: true` and wait for the completion notification, exactly
+   as Stage 1 does. Stdout to `$TRIAGE_RAW`.
+
+   This call was previously foreground with `timeout: 300000` on the assumption
+   that a single-shot triage runs 1 to 3 minutes. Observed on 2026-07-23: a
+   24-finding triage exceeded 300 seconds and was shunted to the background
+   mid-call, which leaves the caller unsure whether it failed or is still
+   working. Background launch removes the ambiguity. Apply the same 20-minute
+   bound as Stage 1; on breach, record `triage: TIMEOUT` and take the degraded
+   self-triage path in step 2, disclosing it.
 2. Extract the response (last `^codex$` to `^tokens used$`, strip `^hook: `
    lines) and validate the headers `## Triage table` and
    `## Fix recommendations`. On non-zero exit or malformed output: perform the
@@ -225,33 +251,80 @@ survive only with a recorded validity verdict.
    continue with the remaining blocks. If every finding is INVALID, record
    "no plan-fixable issues survived triage" and skip Stage 4.
 
-## Stage 4: Codex final convergence check
+   `$FIXES_FILE` must carry each applied item as a real `### Fix N` block with
+   its Old text and New text fences, per the schema in `codex-transport.md`.
+   Stage 4 parses those fences to confirm the edits landed, so a fixes file
+   summarizing the edits in prose instead of reproducing them makes Stage 4
+   unable to verify anything and it will fail `FIX_NOT_APPLIED`.
+5. Snapshot immediately, before Stage 4 runs:
+
+   ```bash
+   cp "$PLAN_PATH" "$POSTFIX"
+   ```
+
+   This is the post-fix recovery point. Without it the only revert target is
+   `$BACKUP`, so a bad Stage 4 forces you to discard Stages 1 through 3 as
+   well, which is a disproportionate loss for a failure in the cheapest stage.
+
+## Stage 4: Deterministic consistency check
 
 Skip if `skip-final` or no fixes were applied in Stage 3.
 
-Re-run the Codex loop on the merged plan to confirm the applied edits
-introduced no new inconsistencies: same call shape as Stage 1 with prompt
-`$review-plan-auto file:$PLAN_PATH max:2` (a consistency check, not a fresh
-full review), stdout to `$LOOP2_RAW`, background launch. Record `loop2:
-CODEX` plus its `CONVERGENCE:` line in `$FIXES_FILE`. It may revise the plan
-in place; `$BACKUP` remains the full-revert target. Same sad paths and
-`local` fallback as Stage 1.
+Confirm the Stage 3 edits landed and did not break the plan's structure. This
+is a mechanical check, so it runs as a script and finishes in under a second:
+
+```bash
+python3 ~/.claude/skills/review-plan-codex/scripts/verify-applied-fixes.py \
+  --plan "$PLAN_PATH" --snapshot "$POSTFIX" --fixes "$FIXES_FILE"
+```
+
+Record `verify: SCRIPT` plus the emitted `VERIFY:` line in `$FIXES_FILE`. On a
+non-zero exit, record the failure reason verbatim, report it, and leave the
+plan alone: the script never edits, so a failure is information about what
+Stage 3 did, not damage to repair. `--max-growth` defaults to 0.10 and exists
+for plans where the fixes legitimately restructure a section.
+
+The five assertions are: every applied fix's new text is present; code fences
+balance; no section heading is duplicated; the first non-blank line is still a
+level-1 heading; and the line count is within budget of `$POSTFIX`.
+
+**Why this is not a model call.** Through 2026-07-23 this stage re-ran the
+Codex convergence loop with `max:2` and the parenthetical intent "a consistency
+check, not a fresh full review". That intent lived in this file and was never
+transmitted: the prompt sent was `$review-plan-auto file:<path> max:2`, so
+Codex ran a full review, correctly, because that is what it was asked. `max:2`
+bounds passes, not edits per pass or wall clock, and a pass can rewrite the
+whole document. The observed run took 28 minutes, emitted 2.7 MB, moved the
+plan from 526 to 810 lines before trimming to 718, never produced a
+`CONVERGENCE:` verdict, and had to be killed. Checking afterward, **all 17
+applied fixes had been rewritten**: none survived verbatim. The stage meant to
+verify the edits had silently replaced them, destroying the audit trail while
+the substance mostly survived in paraphrase.
+
+The lesson generalizes past this stage: an instruction that lives only in the
+caller's prose is not a constraint on the callee. If a bound matters, it goes
+in the transmitted prompt or in a deterministic check, never in a parenthetical.
 
 ## Output to the user (end of run)
 
 The single report after the unattended run. Include, in this order:
 
 1. Engine table: one row per stage (1, 2, 3, 4) with engine used
-   (CODEX / CLAUDE / LOCAL-fallback), outcome or verdict, and skipped stages
-   marked as skipped with the reason.
-2. Stage 1 `CONVERGENCE:` line and the pre-clean diff summary
-   (`$BACKUP` vs post-Stage-1 plan).
+   (CODEX / CLAUDE / SCRIPT / LOCAL-fallback), outcome or verdict, and skipped
+   stages marked as skipped with the reason.
+2. Stage 1 `CONVERGENCE:` line, the pre-clean diff summary (`$BACKUP` vs
+   post-Stage-1 plan), and the before/after line counts with growth flagged
+   past 25 percent.
 3. Stage 2: finding counts per rubric section, `$REVIEW_FILE` path.
 4. Triage summary: N findings, breakdown VALID / PARTIAL / INVALID, plus the
    "Cross-model disagreement, spot-check these" list (INVALID + LOW).
 5. Fixes applied (list) and any drifted blocks.
-6. Stage 4 `CONVERGENCE:` line (or skipped).
-7. Revert command: `cp "$BACKUP" "$PLAN_PATH"` to undo the entire run.
+6. Stage 4 `VERIFY:` line (or skipped).
+7. Two revert commands, narrower first, because they undo different amounts:
+   - `cp "$POSTFIX" "$PLAN_PATH"` undoes Stage 4 only, keeping the converged
+     plan and all applied fixes.
+   - `cp "$BACKUP" "$PLAN_PATH"` undoes the entire run back to the plan as the
+     user wrote it.
 
 State explicitly anything skipped, fallen back, or unverified (preflight
 failure, unparsed verdict lines, malformed triage, drifted blocks). Do not
