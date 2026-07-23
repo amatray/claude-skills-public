@@ -94,8 +94,8 @@ triage), shell-quoting of `$review-plan-auto`, response extraction, the
    |---|---|
    | `file:path` | Explicit plan location |
    | `skip-internal` | Skip Stage 1 (no Codex pre-clean loop) |
-   | `skip-final` | Skip the Stage 4 final convergence loop |
-   | `local` | No codex calls: loops via local `review-plan-auto` Skill, triage by Claude, all disclosed |
+   | `skip-final` | Skip the Stage 4 consistency check |
+   | `local` | No codex calls: Stage 1 via the local `review-plan-auto` Skill, triage by Claude, all disclosed. Stage 4 still runs; it is a script, not a model call |
    | `help` | Print this table and stop |
 
 2. Locate the plan (four-tier priority, same as review-plan-auto): explicit
@@ -336,5 +336,9 @@ report "done" if a stage was skipped or degraded.
 - `${BASE}_claude_review_<DATE>.md`: Claude's independent critique.
 - `${BASE}_codex_triage_raw_<DATE>.txt`: raw Stage 3 triage stdout.
 - `${BASE}_codex_fixes_<DATE>.md`: gate proofs, triage table, edits, audit trail.
-- `${BASE}_codex_loop2_raw_<DATE>.txt`: raw Stage 4 loop stdout.
-- `${BASE}_pre_codex_<DATE>.md`: plan backup (revert target).
+- `${BASE}_post_fixes_<DATE>.md`: plan after Stage 3, before Stage 4. The
+  narrow revert target and Stage 4's line-count baseline.
+- `${BASE}_pre_codex_<DATE>.md`: plan backup (whole-run revert target).
+
+Stage 4 produces no raw transcript, because it is a script rather than a codex
+call. Its `VERIFY:` line in `$FIXES_FILE` is the whole record.

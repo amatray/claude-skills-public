@@ -33,7 +33,8 @@ edits the plan file), `read-only` for triage calls (critique only).
 ## Call shape A: convergence loop
 
 Runs the Codex-side `review-plan-auto` skill (`~/.codex/skills/review-plan-auto/`)
-on the plan. Used by Stage 1 (no extra flags) and Stage 4 (`max:2`).
+on the plan. Used by Stage 1 only. Stage 4 no longer calls codex; it runs
+`scripts/verify-applied-fixes.py`, documented in SKILL.md.
 
 **Shell-quoting rule (load-bearing):** the literal `$review-plan-auto` must
 reach codex intact. Inside double quotes the shell expands `$review` to an
@@ -42,7 +43,6 @@ concatenate the path:
 
 ```bash
 LOOP_PROMPT='$review-plan-auto file:'"$PLAN_PATH"          # Stage 1
-LOOP_PROMPT='$review-plan-auto file:'"$PLAN_PATH"' max:2'  # Stage 4
 
 cd "$PLAN_DIR" && command codex exec \
   --skip-git-repo-check \
