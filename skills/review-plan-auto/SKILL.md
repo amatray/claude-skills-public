@@ -6,7 +6,7 @@ allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Agent", "Workf
 ---
 # Automated Plan Review
 
-*v2.1 (contract `review-plan-auto/2.1`): iterative plan review with convergence-based stopping. One parallel review pass finds issues, one revision fixes them, then cheap verification passes confirm the fixes and stop. The loop, scoring, guards, and all verbatim review text are a deterministic program in `scripts/review-loop.js`; agents only critique, revise, and verify. ONE SKILL.md serves both Claude Code and Codex: Claude runs the loop through the `Workflow` tool, Codex runs the SAME loop file through `scripts/codex-harness.mjs`, so behavior cannot drift between runtimes.*
+*v2.2 (contract `review-plan-auto/2.2`): iterative plan review with convergence-based stopping. One parallel review pass finds issues, one revision fixes them, then cheap verification passes confirm the fixes and stop. The loop, scoring, guards, and all verbatim review text are a deterministic program in `scripts/review-loop.js`; agents only critique, revise, and verify. ONE SKILL.md serves both Claude Code and Codex: Claude runs the loop through the `Workflow` tool, Codex runs the SAME loop file through `scripts/codex-harness.mjs`, so behavior cannot drift between runtimes.*
 
 Runs the structured plan critique loop automatically until the plan has no confirmed critical issues. Fresh-context reviewers avoid planner bias (except at `depth:quick`, which reviews inline). Verification passes check prior findings rather than re-reviewing from scratch, which is what lets the loop terminate: a review pass that hunts fresh gaps in freshly revised text always finds some, so gap-hunting is confined to pass 1.
 
@@ -28,6 +28,7 @@ Parse `$ARGUMENTS` for flags. **If `$ARGUMENTS` is `help`, print the table below
 | Quick | `quick` | Off | Shorthand for `depth:quick` |
 | Max passes | `max:N` | `4` | Hard cap on passes (pass 1 reviews and revises; passes 2..N verify and re-revise) |
 | Dry run | `dryrun` | Off | Show role + research plan only |
+| Plan kind | `kind:execution/derivation` | Auto-classify | `derivation` runs findings-only: review, adversarially verify, never rewrite the plan |
 
 ### Step 1: Locate and Read the Plan
 
@@ -77,6 +78,23 @@ Default to `human-in-the-loop` when no agent, pipeline, or unattended run is nam
 
 **Announce** the mode alongside the role: "**Execution mode:** [mode]."
 
+### Step 2c: Plan-Kind Classification
+
+Classify what the plan's deliverable is. This decides whether the loop may rewrite the plan at all.
+
+| Plan kind | Signals | Behavior |
+|---|---|---|
+| `execution` (default) | The deliverable is work performed: a pipeline, a build, a campaign, a migration, a set of steps someone runs | Full loop: review, revise, verify, converge |
+| `derivation` | The deliverable is an argument: a proposition, theorem, identity, bound, proof, model derivation, or the intellectual framing of a result | **Findings-only.** Review once, adversarially verify each Red against the plan and the repo, report. The plan file is never rewritten |
+
+Classify as `derivation` when the plan's objective states a result to be established rather than work to be done, and confirm with `kind:` if the user passed it. The reason for the split: in a derivation plan the framing IS the content, so an automated reviser that adds gates, thresholds, and scope caveats to satisfy specificity findings destroys the thing under review and then spends the remaining passes reviewing its own additions. The author revises; the loop only finds and verifies.
+
+**Announce** it with the role and mode: "**Plan kind:** [kind]." For `derivation`, add: "Findings-only: I will not rewrite the plan."
+
+### Step 2d: Thesis Lock
+
+Extract the plan's thesis: the blockquote in its Objective (or Goal / Purpose) section, else that section's opening paragraphs. Pass it as `thesis`; the loop extracts it itself if the arg is omitted. Every agent receives it as immutable. Reviewers may find the thesis wrong, unsupported, or infeasible and say so, but no agent may restate, narrow, or re-scope it, and any finding whose fix would rewrite it is reported as `[Decision-pending]` for the author. Verifiers additionally check that the revision has not demoted it, reporting `thesis-mutated` as a Red if it has.
+
 The execution-mode paragraph passed to reviewers lives in `const contract.modeInstruction`. For `autonomous-execution`, pass `modeInstruction: ""` in Step 4; for `human-in-the-loop`, omit the arg so the loop uses the contract default (this is the human-in-the-loop paragraph). The inline and fallback paths (which do not run the loop file) use this text directly:
 
 > A person executes and approves each step of this plan, operating under standing house rules (explicit approval before anything ships, storage conventions, style and verification rules). Absence of process or governance machinery (owners, monitoring windows, incident procedures, storage policy, approval workflows, measurement schemes) is NOT a finding unless the plan text contradicts a standing rule. Review the substance instead: are the claims correct and verifiable, is each deliverable feasible, is the sequencing sound.
@@ -116,6 +134,8 @@ Assemble these run-specific args (the verbatim dimension, classification, anchor
 | `maxPasses` | The `max:` flag value (omit to use the contract default, 4) |
 | `reviewEffort` | `"medium"` at `depth:standard`, `"high"` at `depth:deep` |
 | `modeInstruction` | `""` for `autonomous-execution`; omit for `human-in-the-loop` |
+| `planKind` | `"derivation"` from Step 2c; omit for `execution` |
+| `thesis` | The Step 2d thesis text; omit to let the loop extract it |
 
 Then run the loop by the **runtime ladder**:
 
@@ -123,7 +143,11 @@ Then run the loop by the **runtime ladder**:
 - **Codex (no Workflow tool):** write the args object to `args.json`, then run `node <this skill's base directory>/scripts/codex-harness.mjs args.json out.json` and read `out.json`. The parent Codex session MUST be unsandboxed (launched with `--dangerously-bypass-approvals-and-sandbox`), or the harness's nested `codex exec` children cannot start under the OS sandbox; the harness fires a preflight probe and fails fast with this remedy. If the parent is sandboxed and cannot be relaunched, use the pivot: the parent writes `args.json` and the user runs the harness command in a plain (non-Codex) shell, then hands back `out.json`. On any harness failure, fail loud naming the failing path; do NOT fall back to an inline review.
 - **Neither tool present:** fail loud naming the missing runtime primitive.
 
-The loop owns the mechanics deterministically: it fans all dimension reviewers out in one `parallel()` call, merges findings by label in code (plus one cheap clustering agent when more than 8 findings survive), dispatches one coherent revision agent (if fixing everything would blow the size cap, it retries with Reds only and defers the Yellows to the report), then runs verification passes in which each dimension's verifier checks only its own prior findings and may add new Reds only for failure modes the revision introduced. It stops on: converged, churn, inflation (a revision over 1.25x the original line count, with a 30-line headroom floor), or the hard cap.
+The loop owns the mechanics deterministically: it fans all dimension reviewers out in one `parallel()` call, merges findings by label in code (plus one cheap clustering agent when more than 8 findings survive), dispatches one coherent revision agent (if fixing everything would blow the size cap, it retries with Reds only and defers the Yellows to the report), then runs verification passes in which each dimension's verifier checks only its own prior findings and may add new Reds only for failure modes the revision introduced. It stops on: converged, churn, self-churn, inflation (a revision over 1.25x the original line count, with a 30-line headroom floor), or the hard cap.
+
+**Self-churn.** When more than half of a verification pass's new Reds anchor to text the previous revision added (a `[CHANGED]`/`[NEW]` section, or a section the reviser named), the loop is reviewing its own machinery rather than the author's plan. It stops immediately with exit `self-churn` and recommends deleting the added machinery instead of specifying it further. Report that recommendation in the summary; do not re-run the loop to "finish" those findings.
+
+**Findings-only (`planKind: "derivation"`).** The loop reviews once, then dispatches one refutation agent per Red that tries to disprove the finding against the plan text and any file it names, drops the refuted ones, and returns. `finalPlan` is the original, byte-for-byte: **do not write it back to the file**, and do not offer to apply findings yourself unless the user asks. Confirmed findings arrive in `notApplied`, with the refutation record in `refutations`.
 
 **Inline path (`depth:quick`):** perform the full-dimension critique inline across all active dimensions, then one inline revision honoring the reviser constraint and the 1.25x inflation cap. Use this critic stance:
 > You are now the critic, not the planner. Do not rationalize. Your job is to find what's missing, what will break, and what's wishful thinking.
