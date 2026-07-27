@@ -65,14 +65,17 @@ The Codex-side skill ends its final message with a single machine-parseable
 line:
 
 ```
-CONVERGENCE: verdict=<APPROVE|REVISE> exit=<approve|clean|churn|inflation|hard-cap|error> score=<N> passes=<K>/<MAX>
+CONVERGENCE: verdict=<APPROVE|REVISE> exit=<approve|clean|churn|self-churn|inflation|hard-cap|findings-only|error> score=<N> passes=<K>/<MAX>
 ```
 
 The exit token set mirrors `const contract.convergence.exitEnum` in
 `review-plan-auto/scripts/review-loop.js`. The v2.1 contract retired the old
 `deterioration|regression|marginal` tokens (the loop never emitted them);
-`churn` and `error` replace that range. Extract the line directly from the raw
-output:
+`churn` and `error` replace that range. The v2.2 contract adds `self-churn` (the
+loop stopped because it was reviewing machinery its own reviser added) and
+`findings-only` (a derivation plan reviewed without being rewritten). Both carry
+`verdict=REVISE`, since the author, not the loop, applies the fixes. Extract the
+line directly from the raw output:
 
 ```bash
 grep -E '^CONVERGENCE: verdict=' "$RAW_OUT" | tail -1
