@@ -180,11 +180,15 @@ The loop owns the mechanics deterministically: it fans all dimension reviewers o
 
 ### Step 5: Generate Final Summary
 
+**Findings-only runs never write.** When the return's `planKind` is `derivation`, the plan file is left exactly as it was, in plan mode and normal mode alike. Say so in the summary.
+
 **Plan-mode behavior:** When in plan mode, write only the final plan (`finalPlan`) to the plan file. Display the convergence trajectory and upstream issues inline.
 
-**Normal mode:** If the plan source is a file, write `finalPlan` to the file.
+**Normal mode:** If the plan source is a file, write `finalPlan` to the file. Back the original up first, outside `/tmp` (a sibling `_archive/` beside the plan), because `/tmp` does not survive a reboot and the pre-review text is the only record of what the author wrote.
 
-Render the summary from the loop's return value using the skeleton in `templates/final-summary.md`. The plan-size line and the DECISION-PENDING section are always filled in; FINDINGS NOT APPLIED appears only when `notApplied` is non-empty; the CHURN REPORT appears only when the exit reason names churn.
+Render the summary from the loop's return value using the skeleton in `templates/final-summary.md`. Lead with the plain-language block; the trajectory table, issue log, and labels come after it. Never open a summary with a score table, and never use a kebab-case finding label in a sentence addressed to the user without saying what it means in words.
+
+**Answering follow-up questions after the run.** Review findings are claims about the plan, not established results. Before asserting any substantive claim about the plan's subject matter in later conversation, re-read the source the plan cites; a finding's compressed phrasing is not a licence to state its content as fact. The plan-size line and the DECISION-PENDING section are always filled in; FINDINGS NOT APPLIED appears only when `notApplied` is non-empty; the CHURN REPORT appears only when the exit reason names churn.
 
 **Then always emit the machine-parseable verdict line** as the LAST line of the final message (skip only for `help` and `dryrun`), per `const contract.convergence`:
 
@@ -193,7 +197,7 @@ CONVERGENCE: verdict=<APPROVE|REVISE> exit=<approve|clean|churn|inflation|hard-c
 ```
 
 - `verdict` = APPROVE iff `exit` is `approve` or `clean`, else REVISE.
-- `exit` is keyed on the return's `status` + `exitReason` prefix: `converged`+`Approved`→`approve`; `converged`+`Converged`→`clean`; `converged`+`Revision applied without verification`→`clean`; `stopped`+`Churn detected`→`churn`; `stopped`+`Inflation detected`→`inflation`; `stopped`+`Hard cap reached`→`hard-cap`; `stopped`+`Revision agent failed`→`error`; `status: "error"` or any unmapped pair →`error` (quote the raw `exitReason` in the summary).
+- `exit` is keyed on the return's `status` + `exitReason` prefix: `converged`+`Approved`→`approve`; `converged`+`Converged`→`clean`; `converged`+`Revision applied without verification`→`clean`; `converged`+`Findings-only review`→`findings-only`; `stopped`+`Churn detected`→`churn`; `stopped`+`Self-churn detected`→`self-churn`; `stopped`+`Inflation detected`→`inflation`; `stopped`+`Hard cap reached`→`hard-cap`; `stopped`+`Revision agent failed`→`error`; `status: "error"` or any unmapped pair →`error` (quote the raw `exitReason` in the summary).
 - `score` = the last `passHistory` entry's score; `passes` = `passHistory.length`/`maxPasses`.
 
 **Name any failed reviewers or verifiers.** On the Codex path, list every entry in `out.json`'s `calls` array with `outcome: "failed"` (a reviewer/verifier dimension whose structured output never validated). On the Claude path, name any dimension whose agent failed. Partial coverage is reported, never silent (Hard Rule 12).
