@@ -60,7 +60,13 @@ Default is **light** (no injection). Only add depth if:
 
 ### Step 4: Output
 
-Output the formatted prompt in a fenced code block. This is your primary deliverable — make sure it actually appears in the conversation.
+Output the formatted prompt in exactly one fenced code block. This is your primary deliverable, so make sure it actually appears in the conversation.
+
+**Fence rules. Violating these breaks the whole reply, so treat them as hard constraints:**
+- Never nest code fences. One opening fence, one closing fence, nothing else.
+- Any label or heading goes outside the block, never inside it.
+- Close the fence before writing anything else. An unclosed fence swallows the entire rest of the response into a code block, so the user sees unwrapped monospace running off the screen.
+- If the formatted prompt must itself contain a triple-backtick fence, wrap the outer block in four backticks instead of three.
 
 After the code block, optionally add:
 - `**Best run in:** [tool] — [reason]` if another tool would serve better (e.g., Perplexity for citation-heavy lookups, Gemini for spreadsheet work)
