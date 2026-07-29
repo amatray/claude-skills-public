@@ -1,19 +1,21 @@
 ---
 name: restart
-description: Use when the user says "restart", "wrap up", "snapshot before clearing", "pickup notes", "session recap", "session log", or wants to clear context and resume current work in a fresh conversation. Writes a structured restart.md to the project root, led by a Created / Sent / Waiting / Next recap and keeping goal, decisions, open items, files touched, and verification commands, appends that recap to a running SESSION_LOG.md, then instructs the user to type /clear.
+description: Use when the user says "restart", "wrap up", "snapshot before clearing", "pickup notes", "session recap", "session log", or wants to clear context and resume current work in a fresh conversation. Writes a structured restart.md to the project root, led by a Created / Sent / Waiting / Next recap and keeping goal, decisions, open items, files touched, and verification commands, appends that recap to a running SESSION_LOG.md, then instructs the user to clear the session (/clear in Claude Code, /new in Codex).
 argument-hint: "none"
 allowed-tools: ["Write", "Read", "Edit", "Bash"]
 ---
 
-# Restart — Pre-Clear Conversation Snapshot
+# Restart: Pre-Clear Conversation Snapshot
 
-Write a `restart.md` to the project root that captures the current conversation's state so the user can clear context with `/clear` and resume in a fresh conversation without losing anything important.
+Write a `restart.md` to the project root that captures the current conversation's state so the user can clear context and resume in a fresh conversation without losing anything important.
 
-This skill cannot programmatically clear the conversation (`/clear` is a UI command the user types). Your job ends with the file on disk and a clear, copy-able resume prompt shown to the user, plus a one-line instruction telling them to run `/clear`.
+This is the canonical spec, shared by Claude and Codex. Codex loads it through the adapter at `~/codex-core/skills/restart/SKILL.md`, which carries only the Codex-specific substitutions. Everything in the workflow is agent-neutral: shell commands, file writes, and conversation recall. The one per-agent difference is the clear command the user types at the end: `/clear` in Claude Code, `/new` in Codex.
+
+This skill cannot programmatically clear the conversation (the clear command is a UI command the user types). Your job ends with the file on disk and a clear, copy-able resume prompt shown to the user, plus a one-line instruction telling them to run the clear command.
 
 ## Why this exists
 
-A naive end-of-session note loses context for two reasons: (1) it captures *what was done* but not the *reasoning* behind decisions, so a fresh Claude re-litigates settled choices, and (2) it omits the *do-not* list, so the fresh Claude re-tries dead ends. This skill fixes both by enforcing a schema that includes decisions-with-reasoning, abandoned approaches, and an explicit Do-NOT section.
+A naive end-of-session note loses context for two reasons: (1) it captures *what was done* but not the *reasoning* behind decisions, so a fresh session re-litigates settled choices, and (2) it omits the *do-not* list, so the fresh session re-tries dead ends. This skill fixes both by enforcing a schema that includes decisions-with-reasoning, abandoned approaches, and an explicit Do-NOT section.
 
 ## Step 1 — Detect project root
 
@@ -82,7 +84,7 @@ Proceed only if the user confirms.
 
 | # | Section | Required? | Cap | Notes |
 |---|---|---|---|---|
-| 1 | Resume prompt block at top | required | — | Tells fresh Claude what to read |
+| 1 | Resume prompt block at top | required | — | Tells the fresh session what to read |
 | 2 | Git State | required if git repo | 20 files per list | Omit whole section if not a git repo |
 | 3 | **Goal(s)** — 1–3 sentences, OR a bullet list if the session spanned multiple unrelated topics | required | — | The "why", not just the "what" |
 | 4 | **Acceptance Criteria** — how to know the goal is done | optional | 5 bullets | Omit if the goal is self-evidently complete |
@@ -92,7 +94,7 @@ Proceed only if the user confirms.
 | 8 | **What's Still Open** — actionable next steps in priority order | required | 10 bullets | First bullet = the immediate next action |
 | 9 | **Blocked / Waiting On** — items NOT yet actionable | optional | 5 bullets | External deps, pending replies, awaited data |
 | 10 | **Abandoned Approaches** — tried and rejected, with reason | optional | 5 bullets | Format: `Approach — reason it failed` |
-| 11 | **Do NOT** — dead ends + off-limits, with one-line reason | optional | 5 bullets | Prevents fresh Claude from re-trying failed paths |
+| 11 | **Do NOT** — dead ends + off-limits, with one-line reason | optional | 5 bullets | Prevents the fresh session from re-trying failed paths |
 | 12 | **Key Variables / State** — runtime values, intermediate results | optional | 5 bullets | Backtick-wrap names |
 | 13 | **Verification Commands** — quick checks of current state | optional | 5 commands | e.g. `git status`, `ls data/temp/`, `tail -n 20 batch_logs/run.log` |
 | 14 | **Files Touched** — created / modified / deleted, with role | required | 30 files total | Source: `git diff --name-only` + recall |
@@ -101,7 +103,7 @@ Proceed only if the user confirms.
 
 ### The Session recap block (headline)
 
-restart.md leads with a short, scannable `## Session recap` that groups the session into four buckets, sourced from the same recall. It is a summary view; the detailed sections below carry the depth for a fresh Claude.
+restart.md leads with a short, scannable `## Session recap` that groups the session into four buckets, sourced from the same recall. It is a summary view; the detailed sections below carry the depth for the fresh session.
 
 - **Created**: new files or artifacts produced this session, each with a one-line purpose. Source: `git diff --name-only` plus recall; overlaps Files Touched (Created), kept terse here.
 - **Sent**: external messages dispatched this session (email via the gmail MCP, Slack), with the returned message ID when there is one. Omit the group entirely if nothing was sent.
@@ -124,7 +126,7 @@ Write the file to `$PROJECT_ROOT/restart.md` using the template below. Replace a
 
 > **Resume prompt** (copy into your next conversation):
 >
-> I'm continuing a session on this project. Read "{ABSOLUTE_PATH}/restart.md" for full context: goal, acceptance criteria, what's done, decisions, constraints, blockers, and what's still open. Also check `~/.claude/projects/<encoded-dir>/memory/MEMORY.md` for any project-specific memory. If restart.md is not at the path above, check the current working directory. Then confirm you've read it and ask which open item to start with.
+> I'm continuing a session on this project. Read "{ABSOLUTE_PATH}/restart.md" for full context: goal, acceptance criteria, what's done, decisions, constraints, blockers, and what's still open. Also check `~/.claude/projects/<encoded-dir>/memory/MEMORY.md` for any project-specific memory (a plain file; readable from Claude or Codex). If restart.md is not at the path above, check the current working directory. Then confirm you've read it and ask which open item to start with.
 
 ---
 
@@ -257,6 +259,6 @@ Tell the user, in this order:
 2. The resume prompt, displayed in a copy-able block (the same block that's inside the file's `> Resume prompt` quote).
 3. A one-line instruction:
 
-> Copy the resume prompt above, then type `/clear` in this conversation, then paste the resume prompt as your first message in the fresh conversation.
+> Copy the resume prompt above, then clear this conversation (`/clear` in Claude Code, `/new` in Codex), then paste the resume prompt as your first message in the fresh conversation.
 
-That ends the skill. The user runs `/clear` themselves; the skill cannot do it.
+That ends the skill. The user runs the clear command themselves; the skill cannot do it.
