@@ -7,7 +7,7 @@ allowed-tools: ["Read", "Write", "Edit", "Bash"]
 
 # /memory — Durable Project Memory
 
-Maintain a `PROJECT_MEMORY.md` at the project root capturing long-term project documentation: research question, decisions, data sources, architecture, workstreams, open questions, and lessons learned. This is durable cross-session memory, distinct from the ephemeral `restart.md` (session handoff) and from the user-level auto-memory in `~/.claude/projects/<encoded-cwd>/memory/`.
+Maintain a `PROJECT_MEMORY.md` at the project root capturing long-term project documentation: research question, decisions, data sources, architecture, workstreams, open questions, and lessons learned. This is durable cross-session memory, distinct from the ephemeral `handoff.md` (session handoff) and from the user-level auto-memory in `~/.claude/projects/<encoded-cwd>/memory/`.
 
 ## Execution model and state-passing
 
@@ -238,7 +238,7 @@ Separator is `:` or `,`. **Never** use `--` or `---` (Hard Rule #2). Each Key De
 - **Repository / location**: `{path or URL}`
 
 ## Key Decisions
-- {decision, including methodology and identification choices}: {short why, dated YYYY-MM} (see `commit abc1234` or `restart_20260512.md`)
+- {decision, including methodology and identification choices}: {short why, dated YYYY-MM} (see `commit abc1234` or `handoff_20260512.md`)
 
 ## Data Sources
 - `{dataset path}`: {what it covers, where stored, access notes}
