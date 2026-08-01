@@ -13,6 +13,15 @@ This is the canonical spec, shared by Claude and Codex. Codex loads it through t
 
 This skill cannot programmatically clear the conversation (the clear command is a UI command the user types). Your job ends with the file on disk and a clear, copy-able resume prompt shown to the user, plus a one-line instruction telling them to run the clear command.
 
+The final response must include the complete resume prompt itself in a
+standalone fenced code block. A reminder to copy it from `restart.md` is not
+enough. The agent cannot populate its own input composer programmatically, so
+the fenced block is the native copyable dialogue behavior.
+
+Read the resume-prompt text from `restart.md`, remove only its Markdown quote
+markers, and reproduce the prompt verbatim in the response. Do not paraphrase
+it or replace it with a pointer back to the file.
+
 ## Why this exists
 
 A naive end-of-session note loses context for two reasons: (1) it captures *what was done* but not the *reasoning* behind decisions, so a fresh session re-litigates settled choices, and (2) it omits the *do-not* list, so the fresh session re-tries dead ends. This skill fixes both by enforcing a schema that includes decisions-with-reasoning, abandoned approaches, and an explicit Do-NOT section.
