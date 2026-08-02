@@ -10,7 +10,7 @@ allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Agent", "WebSe
 
 Stress-test a plan with structured expert critique, web research on best practices, and a revised version if needed. Use after developing a plan, or on any plan file. Catches blind spots, missing steps, and wishful thinking.
 
-**Parity note:** the flag table, plan-location tiers, role table, research queries, review dimensions, classification, and anchoring rule are mirrored with `review-plan-auto/SKILL.md`. The single source of truth for the review dimensions, classification, anchoring rule, and reviser constraint (contract `review-plan-auto/2.2`) is the non-exported `const contract` in `review-plan-auto/scripts/review-loop.js`. When editing any shared section, apply the same edit to `const contract` and to `review-plan-auto/SKILL.md`.
+**Parity note:** the flag table, plan-location tiers, role table, research queries, review dimensions, classification, and anchoring rule are mirrored with `review-plan-auto/SKILL.md`. The single source of truth for the review dimensions, classification, anchoring rule, and reviser constraint (contract `review-plan-auto/2.3`) is the non-exported `const contract` in `review-plan-auto/scripts/review-loop.js`. When editing any shared section, apply the same edit to `const contract` and to `review-plan-auto/SKILL.md`.
 
 ## Instructions
 
