@@ -1,6 +1,6 @@
 ---
 name: audit-paper
-description: Audit academic papers (economics/finance) for typos, grammar, style, prose quality, apparatus, structural coherence, holistic craft, and AI-pattern detection. Default uses track-changes markup in Modules 2-7; use --clean for clean text throughout. Module 6 (Voice & Craft) is offered after Module 5 completes; Module 7 (AI Pattern Detection) is offered after Module 6. Use when user asks to audit or review a paper.
+description: Use when the user asks to audit, review, critique, or clean up an economics or finance manuscript, including requests for typos, grammar, style, prose quality, apparatus, structure, voice, AI-pattern detection, or an interactive HTML review page. Default uses track-changes markup in Modules 2-7; use --clean for clean text throughout.
 disable-model-invocation: false
 argument-hint: "[--html] [--clean] [--modules 1,2,5] [path-to-paper-files]"
 ---
