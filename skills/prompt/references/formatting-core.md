@@ -16,7 +16,12 @@ When formatting a prompt, apply these elements as appropriate (not all are neede
 - **Bookend pattern** — restate the key instruction at the end if the prompt is long
 - **Examples** — include only if they would reduce ambiguity (try zero-shot first)
 
-**Scaling rule:** Match formatting complexity to task complexity. A 1-sentence ask doesn't need a 20-line prompt.
+**Scaling rule:** Match formatting complexity to task complexity, not to the
+length of the user's dictation. A short request about a multi-file project,
+comparison, diagnosis, or design still needs enough context, paths, constraints,
+and output structure to be executable. Light prompts may stay short; Standard
+and Deep prompts should normally expose `Context`, `Task`, `Constraints`, and
+`Output` when those fields carry distinct information.
 
 ---
 
@@ -35,6 +40,7 @@ Before formatting, assess how much depth this task needs. **Default to Light** (
 ### Escalation signals (upgrade from Light)
 
 - Task involves synthesis, analysis, or original argument → **Standard**
+- Task requires reading local files, comparing versions, tracing producers, or classifying changes → **Standard**
 - Task involves research design, causal inference, or policy implications → **Standard** or **Deep**
 - Words like "comprehensive," "thorough," "rigorous" in the request → **Standard** or **Deep**
 - High-stakes deliverables (pre-analysis plan, grant proposal, methodology section) → **Deep**

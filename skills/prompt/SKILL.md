@@ -17,6 +17,18 @@ Format an informal request into a structured prompt, then execute it.
 ## Input
 $ARGUMENTS
 
+## Phase 0: Ground the request
+
+Use the conversation and project context already available before formatting.
+When accuracy depends on local architecture, perform the minimum read-only file
+inspection needed to identify the real paths, producers, constraints, and
+variants. This is grounding, not execution: do not edit files or perform the
+requested work yet.
+
+Prompt detail follows task complexity, not input length. A one-sentence request
+to compare decks, audit a pipeline, or modify generated files still needs the
+architecture that makes the task executable.
+
 ## Why This Skill Exists
 
 Users often dictate informal, rambling requests. This skill adds value by *reformulating* those requests into clear, structured prompts before acting on them. If you skip the reformulation and jump straight to doing the task, the skill has added zero value, since the user could have just typed the request directly. The formatted prompt is the product of Phase 1. Treat it like a deliverable, not a mental note.
@@ -35,7 +47,16 @@ Your first job is to produce a formatted prompt and display it. Nothing else. Do
    - **Deep**: Format + append research/compare/verify block.
    - User can override with `depth:light`, `depth:standard`, or `depth:deep`.
 
-4. **Format into a structured prompt** using the formatting elements in formatting-core.md. Match formatting complexity to task complexity: a 1-sentence ask doesn't need a 20-line prompt.
+   A task involving local files, comparison, diagnosis, design, or multiple
+   steps is at least Standard. Light is for genuinely simple tasks, not merely
+   short dictation.
+
+4. **Format into a structured prompt** using the formatting elements in formatting-core.md. Match formatting complexity to task complexity, not dictation length.
+
+   For Standard and Deep tasks, use explicit `Context`, `Task`, `Constraints`,
+   and `Output` fields whenever they add information. Do not merely paraphrase
+   the user's sentence. Add the local paths, classification scheme, comparison
+   dimensions, and acceptance condition that make the request operational.
 
 5. **Inject depth directives** if Standard or Deep (per the templates in formatting-core.md). For Light, skip.
 
@@ -59,9 +80,33 @@ Phase 1 ends here. You have now produced visible output that the user can see an
 
 Now, and only now, execute the formatted prompt as if the user had typed it directly. Use Claude Code tools (MCP, file access, search) as needed.
 
+A formatted prompt alone is never the final answer. In the same invocation,
+perform at least one concrete Phase 2 action and report its result. For a task
+requiring tools, call the first appropriate tool immediately after displaying
+the prompt. For a task answerable in chat, give the substantive answer
+immediately after it.
+
+`Do not edit`, `assess first`, and similar constraints require read-only
+execution; they are not permission to stop after formatting. Stop after Phase 1
+only when the user explicitly asks for prompt-only output, asks you to wait, or
+the active mode prohibits execution.
+
 **Exception, plan mode**: If plan mode is active, do Phase 1 only. Show the formatted prompt, design the plan, and wait for user approval. Do not execute.
 
 **Exception, hold**: If the user says "hold", "don't run", or "just format", do Phase 1 only.
+
+## Failure checks
+
+| Temptation | Correct response |
+|---|---|
+| "The input is short, so a one-sentence prompt is enough." | Complexity follows the task and project architecture, not dictation length. |
+| "The user only asked whether I can do it." | Feasibility is the task. Inspect the relevant files and give the verdict. |
+| "Do not edit means I should stop after the prompt." | Perform the requested read-only assessment and make no edits. |
+| "I displayed the prompt, so the skill is complete." | Phase 2 is mandatory in the same invocation unless a real hold applies. |
+
+Red flags: the formatted prompt merely restates the user's sentence; a local
+file task names no paths or producer; the answer ends immediately after the
+code block. Any red flag means stop and correct the invocation.
 
 ## Clarification
 
