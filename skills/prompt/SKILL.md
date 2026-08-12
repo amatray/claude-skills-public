@@ -6,7 +6,7 @@ allowed-tools: ["Read", "Glob", "Grep", "Write", "Edit", "Bash", "Agent"]
 ---
 # /prompt: Format and Execute
 
-*v3.1: two-phase skill, format first, execute second*
+*v3.2: two-phase skill, display first, execute immediately*
 
 Format an informal request into a structured prompt, then execute it.
 
@@ -24,6 +24,12 @@ When accuracy depends on local architecture, perform the minimum read-only file
 inspection needed to identify the real paths, producers, constraints, and
 variants. This is grounding, not execution: do not edit files or perform the
 requested work yet.
+
+**Keep the pre-display delay short.** Use context already loaded before reading
+more files. Before Phase 1, make at most one batched read-only inspection, and
+only when the formatted prompt would otherwise name the wrong task, path, or
+producer. If fuller investigation is useful, put it in Phase 2 after the prompt
+is visible. Phase 0 never writes files.
 
 Prompt detail follows task complexity, not input length. A one-sentence request
 to compare decks, audit a pipeline, or modify generated files still needs the
@@ -74,11 +80,19 @@ Your first job is to produce a formatted prompt and display it. Nothing else. Do
 
 Phase 1 ends here. You have now produced visible output that the user can see and review.
 
+The display is not an approval checkpoint. After closing the fence, continue
+directly to Phase 2 in the same invocation. Do not ask the user to approve,
+confirm, or re-enter the formatted prompt. Pause only for an explicit hold or
+when the active mode prohibits execution.
+
 ---
 
 ## Phase 2: Execute
 
 Now, and only now, execute the formatted prompt as if the user had typed it directly. Use Claude Code tools (MCP, file access, search) as needed.
+
+Start automatically. Showing the prompt and then waiting for the user to pull
+the work forward is an incomplete `/prompt` invocation.
 
 A formatted prompt alone is never the final answer. In the same invocation,
 perform at least one concrete Phase 2 action and report its result. For a task
