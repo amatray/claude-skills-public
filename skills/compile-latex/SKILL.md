@@ -11,13 +11,13 @@ Classify the master document before compiling:
 | Profile | Signal | Route |
 |---|---|---|
 | `research` | Academic paper, working paper, policy brief, or research note | Shared research compiler |
-| `beamer` | `documentclass{beamer}` or frames | Existing deck gate and build workflow |
-| `referee` | Referee-report source | Existing referee lint and build workflow |
-| `generic` | Other LaTeX output | Explicit generic compilation |
+| `beamer` | `documentclass{beamer}` or frames | Shared compiler plus deck audit |
+| `referee` | Referee-report source | Shared compiler plus referee lint and label checks |
+| `generic` | Other LaTeX output | Shared compiler with generic profile |
 
 An unclassified document cannot receive research certification.
 
-## Research compilation
+## Compilation
 
 Run:
 
@@ -26,10 +26,14 @@ python3 ~/claude-core/scripts/compile-research-tex.py \
   path/to/master.tex --profile research
 ```
 
+Replace `research` with `beamer`, `referee`, or `generic` when that profile
+applies. The referee profile also requires the manuscript text and either the
+referee lexicon or corpus arguments reported by `--help`.
+
 Do not call `xelatex`, `pdflatex`, `lualatex`, or `latexmk` directly for a
-research document. The shared compiler runs the source linter, uses the correct
-bibliography backend through `latexmk`, verifies the PDF, and writes the QA
-receipt.
+document. The shared compiler runs the profile-specific source checks, uses the
+correct bibliography backend through `latexmk`, verifies the PDF, and writes
+the QA receipt.
 
 Before reporting completion:
 
@@ -39,9 +43,3 @@ Before reporting completion:
 4. State whether the rendered pages were visually inspected. Rendering alone is
    not visual inspection.
 5. Never treat the existence of a PDF as proof of a successful build.
-
-## Other profiles
-
-- For `beamer`, follow the `deck-matray` compile and audit workflow.
-- For `referee`, run both referee lint scripts before compilation.
-- For `generic`, state that no research QA receipt is produced.
