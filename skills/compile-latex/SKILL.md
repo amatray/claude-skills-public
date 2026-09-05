@@ -35,6 +35,10 @@ document. The shared compiler runs the profile-specific source checks, uses the
 correct bibliography backend through `latexmk`, verifies the PDF, and writes
 the QA receipt.
 
+The research-LaTeX source linter runs for every profile. Table and figure rules
+are universal, so labeling a reply or internal document `generic` does not
+bypass regression-table validation.
+
 Before reporting completion:
 
 1. Require a zero exit status.
