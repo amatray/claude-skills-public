@@ -6,7 +6,9 @@ description: >
   formalize an economic idea into a model, solve a model, derive equilibrium
   conditions, check derivations, or verify mathematical results. Also use when
   user says "solve", "derive", "set up the model", "formalize", "verify the math",
-  "check derivation", "model setup".
+  "check derivation", "model setup". Not for the solving_models pipeline
+  repository (the one with AGENTS.md), where a model starts as a sketch
+  interview under prompts/sketch_interview.md; do not use there.
 argument-hint: "[model description or path] [--from=N] [--name=model-name] [--verify]"
 ---
 
