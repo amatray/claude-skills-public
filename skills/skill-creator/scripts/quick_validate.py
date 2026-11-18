@@ -35,7 +35,10 @@ KEY_LINE = re.compile(r"^([A-Za-z0-9_-]+):(?:\s+(.*)|\s*)$")
 # A machine-specific path: home-relative or absolute under /Users.
 MACHINE_PATH = re.compile(r"(?:~|\$HOME|\$\{HOME\}|/Users/[^/\s`'\"]+)/[^\s`'\")\]>,;]*")
 HOME_PREFIX = re.compile(r"^(?:~|\$HOME|\$\{HOME\}|/Users/[^/\s`'\"]+)/")
-PARENT_REF = re.compile(r"(?<![\w./])\.\./[\w.-]+")
+# `../` paths: written after the skill-folder placeholder (resolved against the skill
+# folder), or bare (resolved against the file that contains them).
+PLACEHOLDER_REL = re.compile(r"(?:<this skill>|\$\{CLAUDE_SKILL_DIR\})/((?:\.\./)+[\w.-][\w./-]*)")
+BARE_REL = re.compile(r"(?<![\w./])((?:\./)?(?:\.\./)+[\w.-][\w./-]*)")
 EXEMPT_PREFIXES = (".claude/plans/", ".claude/projects/")
 SKILL_ROOTS = (".claude/skills/", ".claude-fed/skills/", "claude-core/skills/")
 
@@ -84,16 +87,32 @@ def _flow_list(value):
     return [_unquote(p)[0] for p in items if p]
 
 
+def _strip_comment(value):
+    """Strict YAML ends a plain value at ` #`; return the value without that comment."""
+    return re.split(r"\s#", value, maxsplit=1)[0].rstrip()
+
+
+def _scalar_from_lines(lines):
+    """Read a scalar written on the lines after its key (plain or quoted)."""
+    text = " ".join(s.strip() for s in lines if s.strip())
+    if text[:1] in "\"'":
+        if len(text) >= 2 and text[-1] == text[0]:
+            return _unquote(text)[0], True, False
+        return text[1:], True, True  # opened a quote and never closed it
+    return text, False, False
+
+
 def parse_frontmatter(text):
     """Parse frontmatter into a dict.
 
-    Reads plain and quoted values, `|` and `>` block scalars, inline and indented
-    lists, and one level of nested map. Returns (data, problems, plain_values) where
-    problems are lines it could not read and plain_values maps key -> unquoted
-    single-line value (used for the strict-YAML check).
+    Reads plain and quoted values on the key's line or on the indented lines after
+    it, `|` and `>` block scalars, inline lists, indented or column-0 `- ` lists,
+    and one level of nested map. Returns (data, problems, plain, unterminated):
+    problems are lines it could not read, plain maps key -> raw unquoted value
+    (for the strict-YAML check), unterminated lists keys whose quote never closes.
     """
     lines = text.split("\n")
-    data, problems, plain = {}, [], {}
+    data, problems, plain, unterminated = {}, [], {}, []
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -110,14 +129,17 @@ def parse_frontmatter(text):
             i += 1
             continue
         key, value = m.group(1), (m.group(2) or "").rstrip()
-        # Gather the indented block that belongs to this key.
+        # Gather the lines that belong to this key: indented lines, and column-0
+        # `- ` items when the key has no value of its own.
         j = i + 1
         block = []
-        while j < len(lines) and (not lines[j].strip() or lines[j][0] in " \t"):
+        while j < len(lines) and (not lines[j].strip() or lines[j][0] in " \t"
+                                  or (value == "" and lines[j].startswith("- "))):
             block.append(lines[j])
             j += 1
         while block and not block[-1].strip():
             block.pop()
+        stripped = [b.strip() for b in block if b.strip()]
         if value[:1] in ("|", ">"):
             indent = min((len(b) - len(b.lstrip()) for b in block if b.strip()), default=0)
             body = [b[indent:] for b in block]
@@ -128,29 +150,32 @@ def parse_frontmatter(text):
                 data[key] = "\n".join(" ".join(p.split()) for p in paragraphs).strip()
         elif value.startswith("[") and value.endswith("]"):
             data[key] = _flow_list(value)
-        elif value == "" and block:
-            stripped = [b.strip() for b in block if b.strip()]
+        elif value == "" and stripped:
             if all(s.startswith("- ") or s == "-" for s in stripped):
                 data[key] = [_unquote(s[2:])[0] for s in stripped]
+            elif all(KEY_LINE.match(s) for s in stripped):
+                data[key] = {KEY_LINE.match(s).group(1): _unquote(KEY_LINE.match(s).group(2) or "")[0]
+                             for s in stripped}
             else:
-                nested = {}
-                for s in stripped:
-                    nm = KEY_LINE.match(s)
-                    if nm:
-                        nested[nm.group(1)] = _unquote(nm.group(2) or "")[0]
-                    else:
-                        problems.append(f"under `{key}`: cannot read `{s[:40]}`")
-                data[key] = nested
+                scalar, quoted, open_quote = _scalar_from_lines(stripped)
+                if open_quote:
+                    unterminated.append(key)
+                if not quoted:
+                    plain[key] = scalar
+                    scalar = _strip_comment(scalar)
+                data[key] = scalar
+        elif value == "":
+            data[key] = ""
         else:
-            scalar, quoted = _unquote(value)
-            if block and not quoted:
-                # Plain scalar continued on indented lines folds into one line.
-                scalar = " ".join([scalar] + [b.strip() for b in block if b.strip()])
-            data[key] = scalar
+            scalar, quoted, open_quote = _scalar_from_lines([value] + stripped)
+            if open_quote:
+                unterminated.append(key)
             if not quoted:
                 plain[key] = scalar
+                scalar = _strip_comment(scalar)
+            data[key] = scalar
         i = j
-    return data, problems, plain
+    return data, problems, plain, unterminated
 
 
 def strict_yaml_problem(text, plain_values):
@@ -174,7 +199,7 @@ def strict_yaml_problem(text, plain_values):
     for key, value in plain_values.items():
         if ": " in value or value.endswith(":"):
             return f"`{key}` has an unquoted `: ` inside its value, so it fails to parse"
-        if value[:1] in "&*!%@`{":
+        if value and value[0] in "&*!%@`{":
             return f"`{key}` starts with `{value[0]}`, which strict YAML reserves"
     return None
 
@@ -239,8 +264,12 @@ def _scan_paths(skill_path, name, shared):
                     core.append(where)
                 else:
                     other.append(where)
-            for m in PARENT_REF.finditer(line):
-                parent.append(f"{rel}:{n} `{m.group(0)}`")
+            # A `../` path is flagged only when, resolved, it lands outside the skill.
+            for regex, base in ((PLACEHOLDER_REL, skill_path), (BARE_REL, f.parent)):
+                for m in regex.finditer(line):
+                    target = os.path.normpath(os.path.join(str(base), m.group(1)))
+                    if target != str(skill_path) and not target.startswith(str(skill_path) + os.sep):
+                        parent.append(f"{rel}:{n} `{m.group(0)}`")
 
     def listing(items, cap=5):
         shown = "; ".join(items[:cap])
@@ -276,12 +305,16 @@ def collect_findings(skill_path):
     if split is None:
         return [Finding("ERROR", "no YAML frontmatter: SKILL.md must start with a `---` block closed by `---`")]
     fm_text, body, _ = split
-    data, problems, plain = parse_frontmatter(fm_text)
+    data, problems, plain, unterminated = parse_frontmatter(fm_text)
+    # Unreadable lines block only when they cost the two fields every client needs.
+    core_read = all(isinstance(data.get(k), str) and data.get(k).strip() for k in ("name", "description"))
     for p in problems:
-        findings.append(Finding("ERROR", f"frontmatter cannot be read: {p}"))
+        findings.append(Finding("WARN" if core_read else "ERROR", f"frontmatter cannot be read: {p}"))
+    for key in unterminated:
+        findings.append(Finding("WARN", f"`{key}` opens a quote that never closes; close it, or a strict YAML parser rejects the frontmatter"))
 
     strict = strict_yaml_problem(fm_text, plain)
-    if strict and not problems:
+    if strict and not problems and not unterminated:
         findings.append(Finding("WARN", f"frontmatter works in Claude Code but a strict YAML parser misreads it: {strict}. Put the value in double quotes."))
 
     # Keys
@@ -358,7 +391,11 @@ def main(argv):
     any_error = False
     for arg in argv:
         path = Path(arg)
-        findings = collect_findings(path)
+        try:
+            findings = collect_findings(path)
+        except Exception as e:  # exit 3 tells callers the check itself failed
+            print(f"{path.name}: validator crashed ({type(e).__name__}: {e}); skill not checked")
+            return 3
         counts = {lvl: sum(f.level == lvl for f in findings) for lvl in ("ERROR", "WARN", "NOTE")}
         any_error |= counts["ERROR"] > 0
         label = path.resolve().name
