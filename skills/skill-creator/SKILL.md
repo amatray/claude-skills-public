@@ -74,7 +74,7 @@ skill-name/
 Three loading levels:
 
 1. **Metadata** (name + description) — always in context (~100 words).
-2. **SKILL.md body** — loaded when the skill triggers. Target the range Anthropic skill examples cluster in (roughly 150–300 lines); past that, dispatch heavy content to subfolders. The signal is whether failure catalogues or worked examples are crowding out routing.
+2. **SKILL.md body**: loaded when the skill triggers. Keep SKILL.md under 500 lines and the body under about 5,000 tokens, the limits the Agent Skills specification recommends; `scripts/quick_validate.py` warns past either one. Past that, dispatch heavy content to subfolders. The signal is whether failure catalogues or worked examples are crowding out routing.
 3. **Bundled resources** — loaded on demand; scripts can run without being read into context.
 
 Decide subfolder by what the agent does with the content:

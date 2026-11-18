@@ -93,11 +93,50 @@ def validate_skill(skill_path):
 
     return True, "Skill is valid!"
 
+
+# Size limits from the Agent Skills specification (agentskills.io/specification):
+# "Keep your main SKILL.md under 500 lines" and "< 5000 tokens recommended" for
+# the body. Both are recommendations, so they produce warnings and never change
+# the exit code.
+MAX_SKILL_LINES = 500
+MAX_BODY_TOKENS = 5000
+CHARS_PER_TOKEN = 4  # rough proxy; no tokenizer dependency
+
+
+def size_warnings(skill_path):
+    """Return a list of warning strings for SKILL.md size; empty if within limits."""
+    skill_md = Path(skill_path) / 'SKILL.md'
+    if not skill_md.exists():
+        return []
+    content = skill_md.read_text()
+    warnings = []
+
+    n_lines = len(content.splitlines())
+    if n_lines > MAX_SKILL_LINES:
+        warnings.append(
+            f"SKILL.md is {n_lines} lines (recommended under {MAX_SKILL_LINES}). "
+            "Move detailed reference material to references/ or gotchas.md."
+        )
+
+    match = re.match(r'^---\n.*?\n---\n?', content, re.DOTALL)
+    body = content[match.end():] if match else content
+    est_tokens = len(body) // CHARS_PER_TOKEN
+    if est_tokens > MAX_BODY_TOKENS:
+        warnings.append(
+            f"SKILL.md body is about {est_tokens:,} tokens (recommended under {MAX_BODY_TOKENS:,}; "
+            f"estimated at {CHARS_PER_TOKEN} characters per token). "
+            "Move detailed reference material to references/ or gotchas.md."
+        )
+    return warnings
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python quick_validate.py <skill_directory>")
         sys.exit(1)
-    
+
     valid, message = validate_skill(sys.argv[1])
     print(message)
+    for warning in size_warnings(sys.argv[1]):
+        print(f"Warning: {warning}")
     sys.exit(0 if valid else 1)
