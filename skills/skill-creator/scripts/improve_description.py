@@ -135,6 +135,7 @@ Here are some tips that we've found to work well in writing these descriptions:
 - The skill should be phrased in the imperative -- "Use this skill for" rather than "this skill does"
 - The skill description should focus on the user's intent, what they are trying to achieve, vs. the implementation details of how the skill works.
 - The description competes with other skills for Claude's attention — make it distinctive and immediately recognizable.
+- If the current description names what the skill produces (a report, a table, a redlined file), keep that name in your version; never replace it with a list of the skill's workflow steps.
 - If you're getting lots of failures after repeated attempts, change things up. Try different sentence structures or wordings.
 
 I'd encourage you to be creative and mix up the style in different iterations since you'll have multiple opportunities to try different approaches and we'll just grab the highest-scoring one at the end. 

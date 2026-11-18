@@ -19,6 +19,8 @@ The core loop (RED–GREEN–REFACTOR):
 
 Why baseline first: skills get written against imagined failures and end up bloated with defenses against problems the agent would never have made. Watching the unaided baseline tells you what actually breaks — and whether the skill is needed at all. If the baseline already does the right thing, stop.
 
+For a skill meant to save repeated explanation, step 5 also checks whether the agent still asks for information it already had.
+
 Figure out where the user is in this loop and pick up from there. If they say "just vibe with me, skip the evals", do that — but resist skipping the baseline; it's cheap and decides whether the skill earns its existence.
 
 ---
@@ -36,24 +38,45 @@ Extract from conversation history first. The user may already have given you the
 
 Research in parallel via subagents (or inline) if useful.
 
+When the skill is built from work just done in this conversation, separate what is reusable from the specifics of this one case (a country, a meeting, a client, a deadline). The specifics go in the project notes, not the skill: a skill built from one country's run that hard-codes that country fails on the next one.
+
+### Settle the design
+
+Infer these from the task and the conversation, and ask in plain chat only for what cannot be inferred. Each is decided by what a wrong answer costs the person who reads the output.
+
+- **The no-argument run.** Define what happens when the skill is invoked with nothing: a safe default, or a fixed first question with exact wording. Never a silent guess at a missing input.
+- **Failure states.** For each file, MCP server, or input the skill depends on: does it stop and say what is missing, or continue with a visible note? Continuing is right only when the gap costs the reader little. Graceful means saying what is missing, not carrying on regardless.
+- **Depth levels** (light, standard, deep) only if the same user wants the same job done at two different costs and the cheaper run is still correct about what it covers. A skill with levels prints the level it ran at.
+- **Checking the output.** Decide, without asking, whether the output needs a check and what kind:
+  - a fixed rule (the numbers add up, every link opens the right document): a script;
+  - a judgment (is the argument sound, is anything important missing): a separate reviewer agent, because the model that wrote the output tends to approve its own work;
+  - neither: no check.
+
+  Mention a script or no check in one line. A reviewer is provisional until the RED baseline: confirm it if the baseline shows the agent passing its own flawed output, drop it if not. When a reviewer is kept, tell the user in this shape:
+
+  > This skill will hand its output to a separate reviewer before showing it to you. The reason: [the judgment being checked, in the task's words, e.g. "whether the summary claims more than the sources say"]. The same model that wrote it tends to approve its own work, so a fresh reader with no stake in the draft catches more. Cost: each run takes longer and costs more. If you would rather check it yourself, say so and I will leave the reviewer out.
+
+  A skill with a reviewer says, in plain words: the reviewer runs every time; the skill checks that the reviewer actually saved its result; if the reviewer could not finish, the output says it was not reviewed.
+
 ### Frontmatter
 
 Only `name` and `description` are required. Optional fields earn their place:
 
 - `name` — kebab-case slug; must match the folder name.
-- `description` — primary triggering mechanism. **Describe only WHEN to use the skill, not WHAT it does.** Start with "Use when…" and list concrete triggers, symptoms, and contexts. Reason: when the description summarizes the workflow, Claude follows the description and skips reading the skill body — the skill becomes documentation Claude ignores. The skill body is for *what*; the description is only for *when*. Claude also undertriggers, so be a little pushy on coverage: list multiple phrasings the user might use, including indirect ones.
+- `description`: primary triggering mechanism. **Lead with when to use the skill, and name what it produces; never summarize its workflow steps.** Start with "Use when..." and list concrete triggers, symptoms, and contexts, then name the output (the findings report, the checked list, the redlined .docx). Reason: when the description lists the steps, Claude follows the description and skips reading the skill body, so the skill becomes documentation Claude ignores. Naming the output is different: it gives Claude one more phrase to match when a user asks for the thing rather than the task. Claude also undertriggers, so be a little pushy on coverage: list multiple phrasings the user might use, including indirect ones.
 
-  ✅ Good: `Use when the user asks to audit, review, or critique an economics manuscript, or mentions checking a paper for typos, structure, or AI-generated language.`
-  ❌ Bad: `Audits papers by running seven modules — typos, grammar, style, prose, apparatus, voice, AI patterns — then reports findings. Use when reviewing a paper.` (summarizes workflow, will cause Claude to skip the body)
+  ✅ Good: `Use when the user asks to audit, review, or critique an economics manuscript, or mentions checking a paper for typos, structure, or AI-generated language. Produces a findings report and a marked-up copy of the manuscript.`
+  ❌ Bad: `Audits papers by running seven modules (typos, grammar, style, prose, apparatus, voice, AI patterns), then reports findings. Use when reviewing a paper.` (lists the workflow, so Claude skips the body)
 - `argument-hint` — optional. Shown in `/` autocomplete (e.g. `"[path-to-file]"`, `"[--clean] [path]"`).
 - `allowed-tools` — optional but load-bearing when set. Restricts which tools the skill can call. List every tool needed, including MCP tools.
+- `metadata`: optional map. Do not put a version line in the skill body; version control already records every edit. A skill copied to other people's machines (a workshop copy, a published skill) carries `metadata:` with `version: "1.0"`, bumped whenever the canonical copy is re-copied, so its users can tell which copy runs.
 
 Example:
 
 ```yaml
 ---
 name: review-paper
-description: Use when the user asks to review, audit, or critique an economics manuscript, or mentions checking a paper for argument structure, econometric specification, citation completeness, or referee objections.
+description: Use when the user asks to review, audit, or critique an economics manuscript, or mentions checking a paper for argument structure, econometric specification, citation completeness, or referee objections. Produces a referee-style report.
 argument-hint: "[path to .tex or .pdf]"
 allowed-tools: ["Read", "Grep", "Glob", "Write", "Task"]
 ---
@@ -152,6 +175,16 @@ If the rationalization table or Red Flags list grows past ~15 lines combined (he
 **Deeper reading**: `references/persuasion-principles.md` covers the empirical basis (Cialdini, 2021; Meincke et al., 2025, N=28,000) for which persuasion levers — authority, commitment, scarcity, social proof, unity — actually move compliance in LLMs, and which to avoid (liking, reciprocity). Load it when writing a discipline-enforcing skill.
 
 
+## Validate
+
+After any create or modify, run:
+
+```bash
+python3 <this skill>/scripts/quick_validate.py <path/to/skill-folder>
+```
+
+`<this skill>` is the folder this SKILL.md sits in. Fix every ERROR. Report WARN lines to the user; they are recommendations (size, paths, frontmatter a strict parser misreads) and do not block. NOTE lines need no action. Edits made with the Edit or Write tool under the skills root are also validated automatically by a hook where one is installed; the command above is the route everywhere else.
+
 ## Workflow References
 
 Two phases live in `references/` because they only fire when the author is doing that specific activity, not every time the skill triggers:
@@ -193,6 +226,8 @@ Same loop (draft → test → review → improve → repeat), but no subagents:
 
 - **Preserve the original name** (directory and frontmatter `name`). Don't append `-v2`.
 - **Copy to a writeable location before editing** (installed paths may be read-only). Work in `/tmp/skill-name/`, package from the copy.
+- **Building is not publishing.** When the skill lives in a folder that syncs or publishes (a shared skills repository, a plugin), build in the scratch copy and move the result in, in one step, only once the user has approved it. Otherwise every intermediate state is published.
+- **An ignored instruction is not fixed with more instructions.** Before adding an instruction, check whether the skill already had one the agent did not follow. If it did, move that rule into a script or a hook, which run every time, rather than writing it again in prose.
 - If packaging manually, stage in `/tmp/` first, then move to the output directory.
 - **Check for hoist candidates.** If the skill has a Red Flags or rationalization-table section inline and those lines exceed 15 combined, propose hoisting them to `gotchas.md` per the threshold in Anatomy. State the current line count and the proposed split before editing.
 
