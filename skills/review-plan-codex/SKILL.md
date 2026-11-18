@@ -81,7 +81,9 @@ that must not leave the machine.
 
 ## Transport reference
 
-Read `~/.claude/skills/review-plan-codex/references/codex-transport.md` before
+`<this skill>` here and below is the folder this SKILL.md sits in.
+
+Read `<this skill>/references/codex-transport.md` before
 Stage 1; it is the source of truth for both codex call shapes (loop and
 triage), shell-quoting of `$review-plan-auto`, response extraction, the
 `CONVERGENCE:` line grammar, the fixes schema, and the sad-path branches.
@@ -126,7 +128,7 @@ the deterministic Stage 4.
 4. Preflight (skip if `local`):
 
    ```bash
-   bash ~/.claude/skills/review-plan-codex/scripts/codex-preflight.sh "$BASE" "$PLAN_PATH"
+   bash <this skill>/scripts/codex-preflight.sh "$BASE" "$PLAN_PATH"
    ```
 
    On non-zero exit: do NOT abort. Record the preflight stderr verbatim in
@@ -188,9 +190,9 @@ GPT-converged plan by a different model family. One pass, no loop.
 
    ```bash
    if grep -qE 'GUARDRAIL\[|^[[:space:]]*(threshold|assertion|ladder|escalation):' "$PLAN_PATH"; then
-     PROMPT_FILE=~/.claude/skills/review-plan-codex/references/codex-review-prompt-strict.md
+     PROMPT_FILE=<this skill>/references/codex-review-prompt-strict.md
    else
-     PROMPT_FILE=~/.claude/skills/review-plan-codex/references/generic-review-prompt.md
+     PROMPT_FILE=<this skill>/references/generic-review-prompt.md
    fi
    ```
 
@@ -276,7 +278,7 @@ Confirm the Stage 3 edits landed and did not break the plan's structure. This
 is a mechanical check, so it runs as a script and finishes in under a second:
 
 ```bash
-python3 ~/.claude/skills/review-plan-codex/scripts/verify-applied-fixes.py \
+python3 <this skill>/scripts/verify-applied-fixes.py \
   --plan "$PLAN_PATH" --snapshot "$POSTFIX" --fixes "$FIXES_FILE"
 ```
 

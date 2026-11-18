@@ -97,7 +97,7 @@ because a call shunted to the background is indistinguishable from a failed one
 at the moment it happens.
 
 ```bash
-FULL_PROMPT="$(cat ~/.claude/skills/review-plan-codex/references/codex-triage-prompt.md)
+FULL_PROMPT="$(cat <this skill>/references/codex-triage-prompt.md)
 
 ---
 Context briefing: <your 2-4 sentence briefing, derived from the plan>
